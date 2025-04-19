@@ -431,14 +431,18 @@ game_over_timer = 0.0
 #^ ------------------------------------------------------------
 
 powerup_images = {
-    "speed": load_and_scale("./media/game/images/powerups/powerup-speed.png", 0.1),
-    "magnet": load_and_scale("./media/game/images/powerups/powerup-magnet.png", 0.1),
-    "score10": load_and_scale("./media/game/images/powerups/powerup-10.png", 0.1),
+    "speed": load_and_scale("./media/game/images/powerups/powerups-day/powerup-speed.png", 0.1),
+    "magnet": load_and_scale("./media/game/images/powerups/powerups-day/powerup-magnet.png", 0.1),
+    "score10": load_and_scale("./media/game/images/powerups/powerups-day/powerup-10.png", 0.1),
+    "freeze": load_and_scale("./media/game/images/powerups/powerups-day/powerup-freeze.png", 0.1),
+    "random": load_and_scale("./media/game/images/powerups/powerups-day/powerup-random.png", 0.1),
 }
+
 powerups = []                    # aktuell auf der Map liegende Power‑Ups
 powerup_spawn_timer = 0.0        # zählt Sekunden bis zum nächsten Spawn
 powerup_spawn_interval = 30.0    # mindestens 30 s Abstand
 active_powerup = None            # aktuell wirkender Effekt
+freeze_active = False            # Freeze aktiv check
 powerup_effect_timer = 0.0       # Restdauer des aktiven Effekts
 base_speed = player_speed        # merken, um Speed‑Buff zurückzusetzen
 base_magnet_range = 50           # Standard‑Range fürs Aufsammeln
@@ -970,12 +974,13 @@ while running:
 
             # ---------------- Timer Runterzählen ----------------
             if not sheep["following"]:
-                sheep["timer"]["remaining"] -= dt_s
+                if not freeze_active: #! Nötig aufgrund des Freeze powerups
+                    sheep["timer"]["remaining"] -= dt_s
 
                 # Ticks in den letzten 3 Sekunden
                 if sheep["timer"]["remaining"] <= 3 and not sheep["timer"]["active"]:
                     clock_tick_sound.play()
-                    sheep["timer"]["active"] = True  # verhindert mehrfaches Abspielen
+                    sheep["timer"]["active"] = True  #! verhindert mehrfaches Abspielen
 
 
                 # Zeit abgelaufen
@@ -1352,7 +1357,53 @@ while running:
                         "text": "+10!",
                         "color": (255, 255, 100)
                     })
+
+                #& Freeze Powerup
+                elif pu["type"] == "freeze":
+                    active_powerup = "freeze"
+                    powerup_effect_timer = 10.0
+                    freeze_active = True
+
+                    # Popup-Text
+                    score_popups.append({
+                        "x": player_x + 30,
+                        "y": player_y - 20,
+                        "alpha": 255,
+                        "timer": {
+                            "remaining": 2.0,
+                            "active": False,
+                            "last_tick_sound": 4
+                        },
+                        "text": "Zeit eingefroren!",
+                        "color": (150, 255, 255)
+                    })
                 
+                #& Zufalls-Powerup
+                elif pu["type"] == "random":
+                    # Auswahl aus allen außer "random" selbst
+                    random_choice = random.choice(["speed", "magnet", "score10", "freeze"])
+                    # Füge das gewählte Powerup zur Liste hinzu
+                    powerups.append({
+                        "type": random_choice,
+                        "x": player_x,
+                        "y": player_y,
+                        "timer": 0.0  # sofortiger Pickup
+                    })
+
+                    # Popup anzeigen
+                    score_popups.append({
+                        "x": player_x + 30,
+                        "y": player_y - 20,
+                        "alpha": 255,
+                        "timer": {
+                            "remaining": 2.0,
+                            "active": False,
+                            "last_tick_sound": 4
+                        },
+                        "text": "Zufalls-Powerup!",
+                        "color": (255, 255, 255)
+                    })
+
                 #& Powerup entfernen nach Zeit ablauf
                 powerups.remove(pu)
 
@@ -1508,6 +1559,8 @@ while running:
                     player_speed = base_speed
                 elif active_powerup == "magnet":
                     magnet_range = base_magnet_range
+                elif active_powerup == "freeze":
+                    freeze_active = False
                 active_powerup = None
 
         # — Delivery‑Zone leicht highlighten —
