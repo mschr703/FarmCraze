@@ -134,11 +134,16 @@ else:
 logo_rect = logo.get_rect(center=(WIDTH // 2, 150))
 
 #^ -----------------------
-#^  ==== Coin‑Icon für Anzeige ====
+#^  ==== HUD Images ====
 #^ -----------------------
 
-coin_img = pygame.image.load("./media/main-menu/ui/coin.png").convert_alpha()
+# Münz-Icon für die Geldanzeige
+coin_img = pygame.image.load("./media/game/hud/coin.png").convert_alpha()
 coin_img = pygame.transform.scale(coin_img, (32, 32))
+
+# Herz-Icon für Lebensanzeige
+heart_img = pygame.image.load("./media/game/hud/heart.png").convert_alpha()
+heart_img = pygame.transform.scale(heart_img, (32, 32))  # je nach Stil ggf. anpassen
 
 #^ ------------------------------------------------------------
 #^ Hauptmenü Buttons (Spielen, Einstellungen, Verlassen)
@@ -1414,23 +1419,28 @@ while running:
         time_rect = time_surf.get_rect(midtop=(WIDTH // 2, 10))
         screen.blit(time_surf, time_rect)
 
-        #? Score text zeichnen
+        #? Score links oben
         score_text = f"Score: {score}"
         score_surf = pixel_font.render(score_text, True, WHITE)
-        score_rect = score_surf.get_rect(midtop=(WIDTH // 2, time_rect.bottom + 10))
+        score_rect = score_surf.get_rect(topleft=(40, 20))
         screen.blit(score_surf, score_rect)
 
-        #? Lebensanzeige zeichnen
-        lives_text = f"Leben: {lives}"
-        lives_surf = pixel_font.render(lives_text, True, WHITE)
-        lives_rect = lives_surf.get_rect(topright=(WIDTH - 40, 10))
-        screen.blit(lives_surf, lives_rect)
+        #? Herzen oben rechts (Leben)
+        heart_spacing = 10
+        heart_y = 20
+        for i in range(lives):
+            heart_x = WIDTH - (heart_img.get_width() + heart_spacing) * (lives - i) - 40
+            screen.blit(heart_img, (heart_x, heart_y))
 
-        #? Coins unter den Leben anzeigen
-        screen.blit(coin_img, (lives_rect.right - coin_img.get_width(), lives_rect.bottom + 10))
+        #? Coins direkt unter den Herzen
+        coin_y = heart_y + heart_img.get_height() + 10
+        coin_x = WIDTH - coin_img.get_width() - 40
+        screen.blit(coin_img, (coin_x, coin_y))
+
         coins_surf = pixel_font.render(str(coins), True, WHITE)
-        coins_rect = coins_surf.get_rect(midright=(1850,
-                                                lives_rect.bottom + 20 + (coin_img.get_height()-coins_surf.get_height())//2))
+        coins_rect = coins_surf.get_rect(
+            midright=(coin_x - 10, coin_y + coin_img.get_height() // 2)
+        )
         screen.blit(coins_surf, coins_rect)
 
 
