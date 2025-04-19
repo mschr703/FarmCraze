@@ -148,14 +148,21 @@ btn_einstellungen = pygame.transform.scale(btn_einstellungen, button_size)
 btn_verlassen = pygame.image.load("./media/main-menu/buttons/button-verlassen.png").convert_alpha()
 btn_verlassen = pygame.transform.scale(btn_verlassen, button_size)
 
+btn_github = pygame.image.load("./media/main-menu/buttons/button-github.png").convert_alpha()
+btn_github = pygame.transform.scale(btn_github, (70, 70))
+
+
+#& Hover Funktion für die buttons
 def make_hover(surface):
     hover_img = surface.copy() #& Surface kopieren / fillen mit weiss = hover effekt für die buttons
     hover_img.fill((50, 50, 50, 0), special_flags=pygame.BLEND_RGB_ADD)
     return hover_img
 
+#& Letzter step für den hover effekt
 btn_spielen_hover = make_hover(btn_spielen)
 btn_einstellungen_hover = make_hover(btn_einstellungen)
 btn_verlassen_hover = make_hover(btn_verlassen)
+btn_github_hover = make_hover(btn_github)
 
 button_spacing = 110 # abstand zwischen den buttons
 start_y = 395 # start y
@@ -164,6 +171,8 @@ start_y = 395 # start y
 sp_rect = btn_spielen.get_rect(center=(WIDTH // 2, start_y))
 einst_rect = btn_einstellungen.get_rect(center=(WIDTH // 2, start_y + button_spacing))
 quit_rect = btn_verlassen.get_rect(center=(WIDTH // 2, start_y + 2 * button_spacing))
+github_rect = btn_github.get_rect(topleft=(20, 110))
+
 
 #* Ping-Pong-Animation (Hauptmenü) [PPA]
 sp_base_y = sp_rect.centery #& Centery = Center von dem rect // sp base is die start referenz für die animation
@@ -280,6 +289,7 @@ for i in range(3):
 #^ ------------------------------------------------------------
 #^ Musik & Sounds
 #^ ------------------------------------------------------------
+
 pygame.mixer.init()
 music_started = False
 
@@ -486,15 +496,22 @@ while running:
         #? Gamestate = Menü
         if state == "menu":
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if sp_rect.collidepoint(event.pos):
-                    button_click_sound.play()
+                if sp_rect.collidepoint(event.pos): #^ Klick auf Spielen ->
+                    button_click_sound.play() #& button sound
                     print("Klick auf Spielen -> Difficulty-Auswahl")
-                    state = "choose_difficulty"
-                elif einst_rect.collidepoint(event.pos):
+                    state = "choose_difficulty" #& gamestate wird geändert
+
+                elif einst_rect.collidepoint(event.pos): #^ Klick auf Anleitung ->
                     button_click_sound.play()
                     print("Anleitung wird im Browser geöffnet ...")
-                    webbrowser.open("https://lipsum.com") #& Gamestate wird geändert
-                elif quit_rect.collidepoint(event.pos):
+                    webbrowser.open("https://lipsum.com")
+
+                elif github_rect.collidepoint(event.pos): #^ Klick auf Github ->
+                    button_click_sound.play()
+                    import webbrowser
+                    webbrowser.open("https://github.com/mschr703/FarmCraze") #& Github Seite öffnet sich
+
+                elif quit_rect.collidepoint(event.pos): #^ Klick auf Verlassen ->
                     button_click_sound.play() #& Button click regristriert
                     time.sleep(1.0)
                     pygame.quit()
@@ -677,6 +694,7 @@ while running:
 
         screen.blit(logo, logo_rect)
 
+        #! Die ganzen Buttons blitten
         mouse_pos = pygame.mouse.get_pos()
         if sp_rect.collidepoint(mouse_pos):
             screen.blit(btn_spielen_hover, sp_rect)
@@ -692,6 +710,12 @@ while running:
             screen.blit(btn_verlassen_hover, quit_rect)
         else:
             screen.blit(btn_verlassen, quit_rect)
+
+        if github_rect.collidepoint(mouse_pos):
+            screen.blit(btn_github_hover, github_rect)
+        else:
+            screen.blit(btn_github, github_rect)
+
 
         # Highscore
         hs_surf = pixel_font.render(f"Highscore: {highscore}", True, WHITE)
@@ -1328,7 +1352,7 @@ while running:
         current_img = player_sprites[direction_for_render]
         screen.blit(current_img, (player_x, player_y))
 
-        ? Mehrere Schafe Zeichnen + Uhr falls keine Verfolgung
+        #? Mehrere Schafe Zeichnen + Uhr falls keine Verfolgung
         for sheep in sheep_list:
             sheep_img = sheep_sprites[sheep["direction"]]
             draw_glow(screen, sheep["x"], sheep["y"], tick, night_mode, sheep_img.get_width(), sheep_img.get_height())
