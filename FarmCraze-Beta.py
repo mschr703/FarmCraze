@@ -25,6 +25,13 @@ import webbrowser
 # [PKTbearb] - Pull range von dem Magnet Powerup
 # [SCBbearb] - Score Bonus durch den Score Powerup
 # ----- 
+#* Tiere:
+# [SAT1bearb] & [SAT2bearb] - Um den Timer von den Schafen zu verändern (beide müssen gleich geändert werden)
+# ----- 
+#* Spiel:
+# [TABbearb] - Ab wann der Tag wieder beginnt (in der Nacht)
+# [DLVRYbearb] - Delivery Zone der Schafe um den Stall herum
+# ----- 
 
 #^ -----------------------
 #^ Grundlegende Settings
@@ -148,8 +155,14 @@ btn_einstellungen = pygame.transform.scale(btn_einstellungen, button_size)
 btn_verlassen = pygame.image.load("./media/main-menu/buttons/button-verlassen.png").convert_alpha()
 btn_verlassen = pygame.transform.scale(btn_verlassen, button_size)
 
+# Buttons für die Socials
+
 btn_github = pygame.image.load("./media/main-menu/buttons/button-github.png").convert_alpha()
 btn_github = pygame.transform.scale(btn_github, (70, 70))
+
+btn_trello = pygame.image.load("./media/main-menu/buttons/button-trello.png").convert_alpha()
+btn_trello = pygame.transform.scale(btn_trello, (70, 70))
+
 
 
 #& Hover Funktion für die buttons
@@ -163,7 +176,9 @@ btn_spielen_hover = make_hover(btn_spielen)
 btn_einstellungen_hover = make_hover(btn_einstellungen)
 btn_verlassen_hover = make_hover(btn_verlassen)
 btn_github_hover = make_hover(btn_github)
+btn_trello_hover = make_hover(btn_trello)
 
+#& button tweaks
 button_spacing = 110 # abstand zwischen den buttons
 start_y = 395 # start y
 
@@ -171,7 +186,9 @@ start_y = 395 # start y
 sp_rect = btn_spielen.get_rect(center=(WIDTH // 2, start_y))
 einst_rect = btn_einstellungen.get_rect(center=(WIDTH // 2, start_y + button_spacing))
 quit_rect = btn_verlassen.get_rect(center=(WIDTH // 2, start_y + 2 * button_spacing))
+# rects für social buttons
 github_rect = btn_github.get_rect(topleft=(20, 110))
+trello_rect = btn_trello.get_rect(topleft=(github_rect.right + 20, 110))
 
 
 #* Ping-Pong-Animation (Hauptmenü) [PPA]
@@ -508,10 +525,15 @@ while running:
                     print("Anleitung wird im Browser geöffnet ...")
                     webbrowser.open("https://lipsum.com")
 
+
                 elif github_rect.collidepoint(event.pos): #^ Klick auf Github ->
                     button_click_sound.play()
-                    import webbrowser
                     webbrowser.open("https://github.com/mschr703/FarmCraze") #& Github Seite öffnet sich
+
+                elif trello_rect.collidepoint(event.pos): #^ Klick auf Trello ->
+                    button_click_sound.play()
+                    webbrowser.open("https://trello.com/b/8PAAm2gj/farmcraze")  #& Trello Seite öffnet sich
+
 
                 elif quit_rect.collidepoint(event.pos): #^ Klick auf Verlassen ->
                     button_click_sound.play() #& Button click regristriert
@@ -697,26 +719,34 @@ while running:
         screen.blit(logo, logo_rect)
 
         #! Die ganzen Buttons blitten
-        mouse_pos = pygame.mouse.get_pos()
-        if sp_rect.collidepoint(mouse_pos):
+        mouse_pos = pygame.mouse.get_pos() # Maus position
+
+        if sp_rect.collidepoint(mouse_pos): #! Spielen
             screen.blit(btn_spielen_hover, sp_rect)
         else:
             screen.blit(btn_spielen, sp_rect)
 
-        if einst_rect.collidepoint(mouse_pos):
+        if einst_rect.collidepoint(mouse_pos): #! Anleitung
             screen.blit(btn_einstellungen_hover, einst_rect)
         else:
             screen.blit(btn_einstellungen, einst_rect)
 
-        if quit_rect.collidepoint(mouse_pos):
+        if quit_rect.collidepoint(mouse_pos): #! Quit
             screen.blit(btn_verlassen_hover, quit_rect)
         else:
             screen.blit(btn_verlassen, quit_rect)
 
-        if github_rect.collidepoint(mouse_pos):
+        #! Social buttons blit
+
+        if github_rect.collidepoint(mouse_pos): #! Github
             screen.blit(btn_github_hover, github_rect)
         else:
             screen.blit(btn_github, github_rect)
+
+        if trello_rect.collidepoint(mouse_pos): #! Trello
+            screen.blit(btn_trello_hover, trello_rect)
+        else:
+            screen.blit(btn_trello, trello_rect)
 
 
         # Highscore
@@ -811,17 +841,21 @@ while running:
 
         # Stall platzieren, falls noch nicht
         if not stall_placed:
-            # 1) Stall‑Rect holen und positionieren
+            sheep_list.clear()  #^ Vorherige Schafe entfernen um duplikation zu vermeiden
+            sheep_currently_following = None
+            #^ Stall‑Rect holen und positionieren
             stall_rect = stall_img.get_rect()
             margin = 300
             stall_rect.centerx = random.randint(margin, WIDTH - margin)
             stall_rect.centery = random.randint(margin, HEIGHT - margin)
 
-            # 2a) harte Block‑Zone: exakt die Fläche des Stalls
+            #^ harte Block‑Zone: exakt die Fläche des Stalls
+            #^ (Damit der Spieler nicht in den Stall reinlaufen kann)
             block_zone = stall_rect.copy()
 
-            # 2b) Delivery‑Zone: etwas größer, damit Schafe davor schon abgeben können
-            delivery_zone = stall_rect.inflate(80, 80)
+            #^ Delivery Zone: Hier können die Schafe abgegeben werden
+            #^ Etwas größer, damit der Stall einen nicht blockiert
+            delivery_zone = stall_rect.inflate(80, 80) #* [DLVRYbearb]
 
 
             # sheep list
@@ -851,14 +885,15 @@ while running:
                             break
                     if too_close:
                         continue
-
-                    # 4) timer_start je nach Schwierigkeit setzen
+                    
+                    #? Je nach Schwierigkeit den Schaf timer ändern [SAT1bearb]
                     if selected_difficulty == "Leicht":
-                        timer_start = 35.0
+                        timer_start = 36.0
                     elif selected_difficulty == "Mittel":
-                        timer_start = 10.0
+                        timer_start = 29.0
                     else:  # "Schwer"
-                        timer_start = 8.0
+                        timer_start = 24.0
+
 
                     # 5) Schaf mit initialem Timer hinzufügen
                     sheep_list.append({
@@ -1139,7 +1174,7 @@ while running:
                 # 5. Reset Verfolgung
                 sheep_currently_following = None
 
-        # Zeit Tag->Nacht, ab 0:00 => night
+        # Zeit Tag->Nacht, ab 22:00 => night
         if not night_mode:
             if game_minutes < 1320:
                 time_accum += dt_s
@@ -1150,6 +1185,7 @@ while running:
                     game_minutes = 1320
                     night_mode = True
                     time_accum = 0.0
+                    stall_placed = False #^ Damit der Stall wieder neu platziert wird
 
                     #^ Nacht startet Text
                     score_popups.append({
@@ -1210,7 +1246,7 @@ while running:
                 game_minutes += 1
                 time_accum -= 1.0
 
-            if game_minutes >= 1440:
+            if game_minutes >= 1530: #* Tagbeginn (zurzeit 1:30am) [TABbearb] 
                 game_minutes = 1140  # Tag beginnt wieder um 19:00
                 time_accum = 0.0
                 night_mode = False
