@@ -1,0 +1,13 @@
+[tool.pygbag]
+main = "test333.py"
+output = "build/web"
+
+# hier packen wir alles aus media/ ein (Bilder, WAVs, TTFs, ...)
+include = [
+  "media/**",
+  "**/*.wav",
+  "**/*.mp3",
+  "**/*.ogg",
+  "**/*.png",
+  "**/*.ttf",
+]
