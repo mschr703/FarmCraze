@@ -398,7 +398,9 @@ sheep_list = []
 game_over = False
 
 
-# Die Uhr laden / über stalltiere
+#^ --------------------------
+#^  Die Uhr laden / über stalltiere
+#^ --------------------------
 
 clock_img = pygame.image.load("./media/game/images/clock.png").convert_alpha()
 clock_img = pygame.transform.scale_by(clock_img, 0.045)
@@ -1144,12 +1146,26 @@ while running:
                 if time_accum >= 1.0:
                     game_minutes += 1
                     time_accum -= 1.0
-                if game_minutes >= 1320:
+                if game_minutes >= 1320: #^ Wenn 22 Uhr -> Nacht startet
                     game_minutes = 1320
                     night_mode = True
                     time_accum = 0.0
 
-                    # Wechsle Map zur Night-Version
+                    #^ Nacht startet Text
+                    score_popups.append({
+                        "x": WIDTH // 2,
+                        "y": HEIGHT // 2 - 150,
+                        "alpha": 255,
+                        "timer": {
+                            "remaining": 3.0,
+                            "active": False,
+                            "last_tick_sound": 4
+                        },
+                        "text": "Die Nacht beginnt!",
+                        "color": (180, 180, 180)  # Hellgrau
+                    })
+
+                    #^ Wechsle Map zur Night-Version
                     night_map = chosen_map_base + "-night.png"
                     if os.path.exists(night_map):
                         loaded_map = pygame.image.load(night_map).convert()
@@ -1158,7 +1174,7 @@ while running:
                     else:
                         print(f"Night-Map '{night_map}' nicht gefunden, bleibe bei Day-Map ...")
 
-                    # Musik umschalten auf Nacht
+                    #^ Musik umschalten auf Nacht
                     pygame.mixer.music.stop()
                     if os.path.exists(night_music):
                         pygame.mixer.music.load(night_music)
@@ -1169,10 +1185,10 @@ while running:
                     fade_in = True
                     fade_alpha = 255
 
-                    # markiere: Nacht hat gerade begonnen
+                    #^ markiere: Nacht hat gerade begonnen
                     night_just_started = True
 
-                    # code snippet für den wolf spawn
+                    #^ code snippet für den wolf spawn
                     if night_just_started:
                         enemies.clear()
                         for _ in range(4):
@@ -1188,7 +1204,7 @@ while running:
                             })
 
         else:
-            # Nacht => Zeit doppelt so schnell
+            #^ Nacht => Zeit doppelt so schnell
             time_accum += dt_s * 2
             if time_accum >= 1.0:
                 game_minutes += 1
@@ -1406,6 +1422,20 @@ while running:
 
                 #! "Berührten" Wolf entfernen (verhindert leben abzug spam)
                 enemies.remove(e)
+
+                #! Pop-Up Text bei Biss
+                score_popups.append({
+                    "x": player_x,
+                    "y": player_y - 30,
+                    "alpha": 255,
+                    "timer": {
+                        "remaining": 2.0,
+                        "active": False,
+                        "last_tick_sound": 4
+                    },
+                    "text": "Du wurdest gebissen!",
+                    "color": (255, 50, 50)  # Rot
+                })
 
                 #! Neuen wolf an anderer position spawnen
                 new_e = {
