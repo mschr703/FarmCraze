@@ -15,6 +15,17 @@ import webbrowser
 #! Note 2:
 # Am besten lesbar mit der VS code extension: Colorful Comments
 
+# -----------                           -----------
+#* Zum verändern: (STRG+F & Dazugehörige Value suchen)
+# -----------                           -----------
+#* Hauptmenü
+# [PPA] - Ping-Pong Animationsgeschwindigkeit
+# -----            
+#* Powerups:
+# [PKTbearb] - Pull range von dem Magnet Powerup
+# [SCBbearb] - Score Bonus durch den Score Powerup
+# ----- 
+
 #^ -----------------------
 #^ Grundlegende Settings
 #^ -----------------------
@@ -154,7 +165,7 @@ sp_rect = btn_spielen.get_rect(center=(WIDTH // 2, start_y))
 einst_rect = btn_einstellungen.get_rect(center=(WIDTH // 2, start_y + button_spacing))
 quit_rect = btn_verlassen.get_rect(center=(WIDTH // 2, start_y + 2 * button_spacing))
 
-# Ping-Pong-Animation (Hauptmenü)
+#* Ping-Pong-Animation (Hauptmenü) [PPA]
 sp_base_y = sp_rect.centery #& Centery = Center von dem rect // sp base is die start referenz für die animation
 sp_offset = 0.0 #& Wie sehr sie bisher gemoved haben
 sp_dir = 1 #& dir = directions / Richtung wohin sie moven
@@ -292,6 +303,9 @@ deliver_sound.set_volume(0.5)
 clock_tick_sound = pygame.mixer.Sound("./media/game/sounds/effects/sonstiges/clock.wav")
 loose_sound = pygame.mixer.Sound("./media/game/sounds/effects/sonstiges/loose.wav")
 
+powerup_sound = pygame.mixer.Sound("./media/game/sounds/effects/sonstiges/powerup.wav")
+powerup_sound.set_volume(0.5)
+
 #^ ------------------------------------------------------------
 #^ MAPS + Musik für Game-State
 #^ ------------------------------------------------------------
@@ -411,7 +425,7 @@ day_night_fade_in = False
 fade_alpha = 255
 fade_duration = 1.0
 
-# Bool, ob wir schon in "Night-Modus" sind
+# Bool, ob man schon im "Night-Modus" ist
 night_mode = False
 map_loaded = False
 chosen_map_base = None
@@ -679,17 +693,21 @@ while running:
         else:
             screen.blit(btn_verlassen, quit_rect)
 
-        # Highscore anzeigen (rechts, vertikal mittig)
+        # Highscore
         hs_surf = pixel_font.render(f"Highscore: {highscore}", True, WHITE)
-        hs_rect = hs_surf.get_rect(midright=(WIDTH - 100, HEIGHT // 2 - 410))
+        hs_rect = hs_surf.get_rect(topright=(WIDTH - 40, 20))
         screen.blit(hs_surf, hs_rect)
 
-        # Coin icon + Zahl direkt darunter
-        screen.blit(coin_img, (hs_rect.right - coin_img.get_width(), hs_rect.bottom + 20))
+        # Coins nebeneinander
         coins_surf = pixel_font.render(str(coins), True, WHITE)
-        coins_rect = coins_surf.get_rect(midleft=(1750,
-                                                hs_rect.bottom + 20 + (coin_img.get_height()-coins_surf.get_height())//2 + 15))
+        coins_rect = coins_surf.get_rect(topright=(WIDTH - 40, hs_rect.bottom + 20))
+
+        coin_x = coins_rect.left - coin_img.get_width() - 10  # etwas Abstand zur Zahl
+        coin_y = coins_rect.top + (coins_surf.get_height() - coin_img.get_height()) // 2
+
+        screen.blit(coin_img, (coin_x, coin_y))
         screen.blit(coins_surf, coins_rect)
+
 
         # Version & Changelog oben links
         ver_surf = pixel_font.render("Version 1.01", True, WHITE)
@@ -1182,17 +1200,6 @@ while running:
         minute = game_minutes % 60
         time_text_str = f"Tag {current_day}: {hour:02d}:{minute:02d}"
 
-        # Zeit
-        time_surf = pixel_font.render(time_text_str, True, WHITE)
-        time_rect = time_surf.get_rect(midtop=(WIDTH // 2, 10))
-        screen.blit(time_surf, time_rect)
-
-        # Score
-        score_text = f"Score: {score}"
-        score_surf = pixel_font.render(score_text, True, WHITE)
-        score_rect = score_surf.get_rect(midtop=(WIDTH // 2, time_rect.bottom + 10))
-        screen.blit(score_surf, score_rect)
-
         #? -------------------
         #? RENDER GAME 
         #? -------------------
@@ -1212,38 +1219,87 @@ while running:
             pu_rect = pygame.Rect(pu["x"], pu["y"], pu_img.get_width(), pu_img.get_height())
 
             if pu_rect.colliderect(player_rect):
+                powerup_sound.play()
                 # Effekt anwenden
+
+                #& Speed Powerup
                 if pu["type"] == "speed":
                     player_speed = base_speed * 2
                     active_powerup = "speed"
                     powerup_effect_timer = 10.0
+                    #& Text Popup für Speed
+                    score_popups.append({
+                        "x": player_x + 30,
+                        "y": player_y - 20,
+                        "alpha": 255,
+                        "timer": {
+                            "remaining": 2.0,
+                            "active": False,
+                            "last_tick_sound": 4
+                        },
+                        "text": "Schnelligkeit aufgesammelt!",
+                        "color": (100, 255, 100)
+                    })
+
+                #& Magnet Powerup
                 elif pu["type"] == "magnet":
-                    magnet_range = base_magnet_range * 5 # Pull / Magnet - Pullkraft Bearbeiten
+                    magnet_range = base_magnet_range * 5 #* Pull / Magnet - Pullkraft HIER Bearbeiten [PKTbearb]
                     active_powerup = "magnet"
                     powerup_effect_timer = 10.0
+                    #& Text Popup Magnet
+                    score_popups.append({
+                        "x": player_x + 30,
+                        "y": player_y - 20,
+                        "alpha": 255,
+                        "timer": {
+                            "remaining": 2.0,
+                            "active": False,
+                            "last_tick_sound": 4
+                        },
+                        "text": "Magnet aufgesammelt!",
+                        "color": (100, 200, 255)
+                    })
+                
+                #& +10 Powerup
                 elif pu["type"] == "score10":
-                    score += 10
-
+                    score += 10 #* Score Bonus durch den powerup HIER bearbeiten [SCBbearb]
+                    #& Text Popup +10
+                    score_popups.append({
+                        "x": player_x + 30,
+                        "y": player_y - 20,
+                        "alpha": 255,
+                        "timer": {
+                            "remaining": 2.0,
+                            "active": False,
+                            "last_tick_sound": 4
+                        },
+                        "text": "+10!",
+                        "color": (255, 255, 100)
+                    })
+                
+                #& Powerup entfernen nach Zeit ablauf
                 powerups.remove(pu)
 
         screen.blit(map_surface, (0, 0))
 
-        # Zeit
+        #? Zeit Text zeichnen
         time_surf = pixel_font.render(time_text_str, True, WHITE)
         time_rect = time_surf.get_rect(midtop=(WIDTH // 2, 10))
         screen.blit(time_surf, time_rect)
 
+        #? Score text zeichnen
         score_text = f"Score: {score}"
         score_surf = pixel_font.render(score_text, True, WHITE)
         score_rect = score_surf.get_rect(midtop=(WIDTH // 2, time_rect.bottom + 10))
         screen.blit(score_surf, score_rect)
 
-        # lebensanzeige
+        #? Lebensanzeige zeichnen
         lives_text = f"Leben: {lives}"
         lives_surf = pixel_font.render(lives_text, True, WHITE)
         lives_rect = lives_surf.get_rect(topright=(WIDTH - 40, 10))
         screen.blit(lives_surf, lives_rect)
-        # Coins unter den Leben anzeigen
+
+        #? Coins unter den Leben anzeigen
         screen.blit(coin_img, (lives_rect.right - coin_img.get_width(), lives_rect.bottom + 10))
         coins_surf = pixel_font.render(str(coins), True, WHITE)
         coins_rect = coins_surf.get_rect(midright=(1850,
@@ -1252,7 +1308,7 @@ while running:
 
 
 
-        # Score Popups zuletzt anzeigen
+        #* Score Popups zeichnen
         for popup in score_popups[:]:
             popup["y"] -= 30 * dt_s
             popup["alpha"] -= 255 * dt_s
@@ -1267,12 +1323,12 @@ while running:
             rect = popup_text.get_rect(center=(popup["x"], popup["y"]))
             screen.blit(popup_text, rect)
 
-        # Wolf
-        draw_glow(screen, player_x, player_y, tick, night_mode, current_img.get_width(), current_img.get_height()) #? glow wolf
+        #? Wolf zeichnen
+        draw_glow(screen, player_x, player_y, tick, night_mode, current_img.get_width(), current_img.get_height()) #? glow für den Wolf (Nachts)
         current_img = player_sprites[direction_for_render]
         screen.blit(current_img, (player_x, player_y))
 
-        # Schafe
+        ? Mehrere Schafe Zeichnen + Uhr falls keine Verfolgung
         for sheep in sheep_list:
             sheep_img = sheep_sprites[sheep["direction"]]
             draw_glow(screen, sheep["x"], sheep["y"], tick, night_mode, sheep_img.get_width(), sheep_img.get_height())
@@ -1284,17 +1340,17 @@ while running:
                 time_text = pixel_font.render(f"{seconds_left}s", True, WHITE)
                 screen.blit(time_text, (sheep["x"] + 40, sheep["y"] - 40))
 
-        # ─────────────────────────────────────────────────────────────────────
-        # wolf (gegner) spawn
-        # ─────────────────────────────────────────────────────────────
+        #! ─────────────────────────────────────────────────────────────────────
+        #! wolf (gegner) spawn/zeichnen
+        #! ─────────────────────────────────────────────────────────────
         for e in enemies:
-            # a) Timer für Richtungswechsel
+            #! Timer damit sie die Richtung korrekt wechseln
             e["timer"] += dt_s
             if e["timer"] >= enemy_change_dir_interval:
                 e["dir"] = random.choice(["up","down","left","right"])
                 e["timer"] = 0.0
 
-            # b) Bewegung
+            #! Bewegung der Wölfe (Up/Down/Left/Right)
             if e["dir"] == "up":
                 e["y"] -= enemy_speed
             elif e["dir"] == "down":
@@ -1304,30 +1360,30 @@ while running:
             else:
                 e["x"] += enemy_speed
 
-            # c) Am Bildschirmrand abprallen
+            #! Out of bounds prüfen
             max_x = WIDTH - enemy_sprites["left"].get_width()
             max_y = HEIGHT - enemy_sprites["left"].get_height()
             e["x"] = max(0, min(e["x"], max_x))
             e["y"] = max(0, min(e["y"], max_y))
 
-            # d) Draw
+            #! Zeichnen
             sprite = enemy_sprites[e["dir"]]
             screen.blit(sprite, (e["x"], e["y"]))
 
-            # e) Kollision mit Spieler?
+            #! Collision mit Spieler prüfen
             enemy_rect = pygame.Rect(e["x"], e["y"],
                                     sprite.get_width(), sprite.get_height())
             player_rect = pygame.Rect(player_x, player_y,
                                     player_sprites[direction_for_render].get_width(),
                                     player_sprites[direction_for_render].get_height())
-            if enemy_rect.colliderect(player_rect):
-                lives -= 1
-                cancel_sound.play()
+            if enemy_rect.colliderect(player_rect): #! Wolf berührt ->
+                lives -= 1 #! Leben abziehen
+                cancel_sound.play() ##! Sound abspielen
 
-                # alten Wolf entfernen
+                #! "Berührten" Wolf entfernen (verhindert leben abzug spam)
                 enemies.remove(e)
 
-                # gleich einen neuen Wolf spawnen
+                #! Neuen wolf an anderer position spawnen
                 new_e = {
                     "x": random.randint(100, WIDTH-100),
                     "y": random.randint(100, HEIGHT-100),
@@ -1336,7 +1392,7 @@ while running:
                 }
                 enemies.append(new_e)
 
-                # Game Over prüfen
+                #! Game Over prüfen
                 if lives <= 0:
                     game_over = True
                     pygame.mixer.music.stop()
@@ -1389,7 +1445,7 @@ while running:
             fade_surf.set_alpha(fade_alpha)
             screen.blit(fade_surf, (0, 0))
 
-        # Nachricht anzeigen, wenn Schaf abgebrochen hat6
+        # Nachricht anzeigen, wenn Schaf abgebrochen hat
         if cancel_message_timer > 0:
             cancel_message_timer -= dt_s
             cancel_message_alpha = min(255, cancel_message_alpha + 10)  # Fade-In
@@ -1399,58 +1455,65 @@ while running:
             text_rect = text_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
             screen.blit(text_surf, text_rect)
 
-        if game_over:
-            # 1) dunkelstes Overlay
+        #! -----------------------------------------
+        #! Game Over Screen
+        #! -----------------------------------------
+
+        if game_over: #! Game Over!
+
+            #? Dunkles Overlay
             dark_overlay = pygame.Surface((WIDTH, HEIGHT))
             dark_overlay.fill((0, 0, 0))
             dark_overlay.set_alpha(255)   # <- komplett schwarz
             screen.blit(dark_overlay, (0, 0))
 
-            # 2) Game‑Over‑Text
+            #? Text: Du hast verloren
             game_over_text = pixel_font.render("Du hast verloren...", True, RED)
             text_rect = game_over_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
             screen.blit(game_over_text, text_rect)
 
-            # 3) Timer für automatischen Rücksprung
-            # definiere game_over_timer einmalig oben im Skript (oder hier global):
-            #   game_over_timer = 0.0
-            #
-            # dann hier:
+            #? Hinwseis Text: ESC drücken
+            restart_text = pixel_font.render("Drücke ESC um neuzustarten", True, WHITE)
+            restart_rect = restart_text.get_rect(center=(WIDTH // 2, text_rect.bottom + 40))
+            screen.blit(restart_text, restart_rect)
+
+            #? Timer für automatischen zurücksprung
             game_over_timer += dt_s
             if game_over_timer >= 5.0:
-                # zurück ins Menü & Timer zurücksetzen
+                #? zurück ins Menü & Timer zurücksetzen
                 game_over_timer = 0.0
-                # hier ggf. alle Game‑Variablen wie gehabt zurücksetzen
+
                 # ----------------------------
-                # Reset aller Game‑Variablen
+                #? Reset aller Game‑Variablen
                 # ----------------------------
-                # Map + Nacht/Tag
+
+                #? Map + Nacht/Tag
                 map_loaded = False
                 map_surface = None
                 chosen_map_base = None
                 night_mode = False
                 fade_in = False
 
-                # Tages‑ und Zeit‑Zähler
+                #? Tages‑ und Zeit‑Zähler
                 current_day = 1
                 game_minutes = 1140    # 19:00
                 time_accum = 0.0
 
-                # Stall + Schafe
+                #? Stall + Schafe
                 stall_placed = False
                 sheep_list.clear()
                 sheep_currently_following = None
 
-                # Enemies (Wölfe)
+                #? Enemies (Wölfe)
                 enemies.clear()
                 night_just_started = False
 
-                # Score und Popups
+                #? Score und Popups
                 score = 0
                 score_popups.clear()
                 game_over = False
 
-                # Leben zurücksetzen je nach gewählter Schwierigkeit
+                #? Leben zurücksetzen je nach gewählter Schwierigkeit
                 if selected_difficulty == "Leicht":
                     lives = 5
                 elif selected_difficulty == "Mittel":
@@ -1464,7 +1527,7 @@ while running:
                 map_loaded = False
                 map_surface = None
                 stall_placed = False
-                # Sound stoppen
+                #? Sound stoppen
                 pygame.mixer.music.stop()
                 state = "menu"
 
