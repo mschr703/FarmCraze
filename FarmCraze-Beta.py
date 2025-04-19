@@ -523,13 +523,6 @@ while running:
                     map_surface = None
                     stall_placed = False
 
-        # SETTINGS
-        elif state == "settings":
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if close_rect.collidepoint(event.pos):
-                    button_click_sound.play()
-                    state = "menu"
-
         # GAME
         elif state == "game":
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
