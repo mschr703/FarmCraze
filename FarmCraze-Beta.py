@@ -24,13 +24,19 @@ import webbrowser
 #* Powerups & Snacks:
 # [PKTbearb] - Pull range von dem Magnet Powerup
 # [SCBbearb] - Score Bonus durch den Score Powerup
+# [SBPUbearb] - Speed Bonus durch Speed Powerup
 # [SNPIbearb] - Snack Spawn Intervall
-# [SNTC] - Snack Toxic Chance
+# [FPETbearb] - Timer (wie lange der Freeze Powerup anhält)
 # [SNCKprob] - probability das der snack toxic wird je nach schwierigkeit
 # [PUTIbearb] - Despawn Zeit der Powerups
 # ----- 
+#* Events
+# [UFOWSKbearb] - Ufo Event Spawn Wahrscheinlichkeit
+# ----- 
 #* Tiere:
-# [SAT1bearb] & [SAT2bearb] - Um den Timer von den Schafen zu verändern (beide müssen gleich geändert werden)
+# [SAT1bearb] - Timer der Schafe bearbeiten
+# [VABCTbearb] - Schaf bricht Verfolgung ab (chance)
+# [SFVSnormal] & [SFVSevent] - Verfolgungs-Speed der Schafe normal und in einem Event wie zb UFO
 # ----- 
 #* Spiel:
 # [TABbearb] - Ab wann der Tag wieder beginnt (in der Nacht)
@@ -436,6 +442,16 @@ sheep_sprites = {
     "right": load_sheep_sprite("rechts"),
 }
 
+#^ Schaf Timer 
+
+def get_default_timer(difficulty):
+    if difficulty == "Leicht": #* [SAT1bearb] Timer der Schafe bearbeiten
+        return 36.0
+    elif difficulty == "Mittel":
+        return 29.0
+    else:
+        return 24.0
+
 
 #^ ─────────────────────────────────────────────────────────────────────
 #^ Wolf (Gegner in der Nacht)
@@ -467,6 +483,31 @@ score_popups = []
 sheep_list = []
 
 game_over = False
+
+#^ --------------------------
+#^ Random-Event Variablen (UFO-Event, Vulkan-Event, Sturm-Event)
+#^ --------------------------
+
+#? Ufo Event Variablen
+event_active = False
+event_timer = 0.0
+event_duration = 15.0
+event_type = None
+
+#? UFO Event UI
+ufo_img = pygame.image.load("./media/game/images/events/ufo/ufo.png").convert_alpha()
+ufo_img = pygame.transform.scale_by(ufo_img, 0.1)  # ggf. anpassen
+ufo_text = pixel_font.render("UFO-Sichtung! Schafe rasten aus!", True, (100, 255, 100))
+
+#? Sound beim Start des UFO-Events
+ufo_sound = pygame.mixer.Sound("./media/game/images/events/ufo/ufo-landing.wav")
+ufo_sound.set_volume(0.5)
+
+#? Sound beim teleportieren der Tiere
+teleport_sound = pygame.mixer.Sound("./media/game/images/events/ufo/teleport.wav")
+teleport_sound.set_volume(0.5)
+
+
 
 
 #^ --------------------------
@@ -959,14 +1000,7 @@ while running:
                     if too_close:
                         continue
                     
-                    #? Je nach Schwierigkeit den Schaf timer ändern [SAT1bearb]
-                    if selected_difficulty == "Leicht":
-                        timer_start = 36.0
-                    elif selected_difficulty == "Mittel":
-                        timer_start = 29.0
-                    else:  # "Schwer"
-                        timer_start = 24.0
-
+                    timer_start = get_default_timer(selected_difficulty)
 
                     # 5) Schaf mit initialem Timer hinzufügen
                     sheep_list.append({
@@ -975,7 +1009,7 @@ while running:
                         "direction": "up",
                         "following": False,
                         "timer": {
-                            "remaining": timer_start,
+                            "remaining": 10.0 if event_active else get_default_timer(selected_difficulty),
                             "active": False,
                             "last_tick_sound": 4
                         },
@@ -1044,7 +1078,7 @@ while running:
             # ---------------- Timer Initialisieren ----------------
             if "timer" not in sheep or type(sheep["timer"]) != dict:
                 sheep["timer"] = {
-                    "remaining": 36.0 if selected_difficulty == "Leicht" else 29.0 if selected_difficulty == "Mittel" else 24.0,
+                    "remaining": 10.0 if event_active else get_default_timer(selected_difficulty),
                     "active": False,
                     "last_tick_sound": 4
     }
@@ -1126,13 +1160,8 @@ while running:
                         if too_close:
                             continue
 
-                        # timer_start je nach Schwierigkeit setzen
-                        if selected_difficulty == "Leicht":
-                            timer_start = 35.0
-                        elif selected_difficulty == "Mittel":
-                            timer_start = 10.0
-                        else:
-                            timer_start = 8.0
+                        timer_start = get_default_timer(selected_difficulty)
+
 
                         sheep_list.append({
                             "x": new_x,
@@ -1140,7 +1169,7 @@ while running:
                             "direction": "up",
                             "following": False,
                             "timer": {
-                                "remaining": timer_start,
+                                "remaining": 10.0 if event_active else get_default_timer(selected_difficulty),
                                 "active": False,
                                 "last_tick_sound": 4
                             },
@@ -1154,7 +1183,7 @@ while running:
                 pickup_sound.play()
 
             if sheep["following"] and selected_difficulty in ["Mittel", "Schwer"]:
-                cancel_chance = 0.0005 if selected_difficulty == "Mittel" else 0.003
+                cancel_chance = 0.0005 if selected_difficulty == "Mittel" else 0.003 #* Verfolgungs-Abbruch Chance bei den Tieren [VABCTbearb]
                 if random.random() < cancel_chance:
                     sheep["following"] = False
                     if sheep_currently_following == sheep:
@@ -1164,7 +1193,9 @@ while running:
                     cancel_message_alpha = 0
 
             if sheep == sheep_currently_following and sheep["following"] and distance > 35:
-                step = 3
+                step = 3 # Schaf Verfolgungs-Speed Normal #* [SFVSnormal]
+                if sheep.get("speed_boost", False):
+                    step = 8  # Schaf Verfolgungs-Speed Event #* [SFVSevent]
                 if abs(dx_s) > abs(dy_s):
                     sheep["direction"] = "left" if dx_s < 0 else "right"
                 else:
@@ -1231,13 +1262,7 @@ while running:
                                 too_close = True
                                 break
                         if not too_close:
-                            # Zeit je nach Schwierigkeit setzen
-                            if selected_difficulty == "Leicht":
-                                timer_start = 36.0
-                            elif selected_difficulty == "Mittel":
-                                timer_start = 29.0
-                            else:
-                                timer_start = 24.0
+                            timer_start = get_default_timer(selected_difficulty)
 
                             sheep_list.append({
                                 "x": new_x,
@@ -1245,7 +1270,7 @@ while running:
                                 "direction": "up",
                                 "following": False,
                                 "timer": {
-                                    "remaining": timer_start,
+                                    "remaining": 10.0 if event_active else get_default_timer(selected_difficulty),
                                     "active": False,
                                     "last_tick_sound": 4
                                 },
@@ -1269,6 +1294,43 @@ while running:
                     night_mode = True
                     time_accum = 0.0
                     stall_placed = False #^ Damit der Stall wieder neu platziert wird
+            #! UFO EVENT!
+            if not night_mode and not event_active and 1140 <= game_minutes < 1320 and random.random() < 0.0002: #* Ufo event Wahrscheinlichkeit [UFOWSKbearb]
+                event_active = True
+                event_type = "ufo"
+                event_timer = event_duration
+                player_speed = base_speed * 2
+                ufo_sound.play()
+
+                def teleport_sheep():
+                    for sheep in sheep_list:
+                        sheep["x"] = random.randint(100, WIDTH - 100)
+                        sheep["y"] = random.randint(100, HEIGHT - 100)
+                        sheep["speed_boost"] = True
+                        sheep["timer"]["remaining"] = 10.0
+                        sheep["timer"]["active"] = False
+                    teleport_sound.play()
+
+                teleport_sheep()  # sofort
+                pygame.time.set_timer(pygame.USEREVENT + 1, 1000)
+                pygame.time.set_timer(pygame.USEREVENT + 2, 2000)
+                pygame.time.set_timer(pygame.USEREVENT + 3, 3000)
+
+            if event_active:
+                event_timer -= dt_s
+
+                # Während des Events zufällig teleportieren (selten)
+                if random.random() < 0.003:
+                    teleport_sheep()
+
+                if event_timer <= 0:
+                    event_active = False
+                    event_type = None
+                    player_speed = base_speed
+                    for sheep in sheep_list:
+                        sheep["speed_boost"] = False
+                        if not sheep["following"]:  # nur wenn Schaf gerade NICHT folgt
+                            sheep["timer"]["remaining"] = get_default_timer(selected_difficulty)
 
                     #^ Nacht startet Text
                     score_popups.append({
@@ -1383,7 +1445,7 @@ while running:
 
                 #& Speed Powerup
                 if pu["type"] == "speed":
-                    player_speed = base_speed * 2
+                    player_speed = base_speed * 2 #* Speed bonus durch Powerup [SBPUbearb]
                     active_powerup = "speed"
                     powerup_effect_timer = 10.0
                     #& Text Popup für Speed
@@ -1439,7 +1501,7 @@ while running:
                 #& Freeze Powerup
                 elif pu["type"] == "freeze":
                     active_powerup = "freeze"
-                    powerup_effect_timer = 10.0
+                    powerup_effect_timer = 10.0 #* Timer für den Freeze Effekt Powerup [FPETbearb]
                     freeze_active = True
 
                     # Popup-Text
@@ -1655,7 +1717,7 @@ while running:
                 dist_x = abs(player_x - snack["x"])
                 dist_y = abs(player_y - snack["y"])
                 distance = math.hypot(player_x - snack["x"], player_y - snack["y"])
-                if distance < 130 and not snack["transformed"]:  # größere Range
+                if distance < 175 and not snack["transformed"]:  # größere Range
                     chance = snack_toxic_chances.get(selected_difficulty, 0.25)
                     if random.random() < chance:
                         snack["type"] = "toxic"
@@ -1748,6 +1810,16 @@ while running:
             text_rect = text_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
             screen.blit(text_surf, text_rect)
 
+        #? ------
+        #? Event Blits
+        #? ------
+
+        #? Ufo Event
+        if event_active and event_type == "ufo":
+            screen.blit(ufo_img, (500, 40))  # weiter links
+            screen.blit(ufo_text, (WIDTH // 2 - ufo_text.get_width() // 2 + 60, 55))
+
+
         #! -----------------------------------------
         #! Game Over Screen
         #! -----------------------------------------
@@ -1765,7 +1837,7 @@ while running:
             text_rect = game_over_text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
             screen.blit(game_over_text, text_rect)
 
-            #? Hinwseis Text: ESC drücken
+            #? Hinweis Text: ESC drücken
             restart_text = pixel_font.render("Drücke ESC um neuzustarten", True, WHITE)
             restart_rect = restart_text.get_rect(center=(WIDTH // 2, text_rect.bottom + 40))
             screen.blit(restart_text, restart_rect)
