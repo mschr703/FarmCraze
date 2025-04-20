@@ -422,7 +422,7 @@ player_sprites = {
 
 player_x = 400
 player_y = 300
-player_speed = 4
+player_speed = 5
 player_direction = "down"
 tick = 0
 is_walking = False
@@ -485,10 +485,103 @@ sheep_list = []
 game_over = False
 
 #^ --------------------------
-#^ Random-Event Variablen (UFO-Event, Vulkan-Event, Sturm-Event)
+#^ Event Handler & Event Variablen (UFO-Event, Vulkan-Event, Sturm-Event)
 #^ --------------------------
 
-#? Ufo Event Variablen
+#! ----------------------
+#! Allgemeine Event funktionen
+#! ----------------------
+
+def start_ufo_event():
+    global player_speed
+
+    if night_mode:
+        print("UFO-Event geblockt (Nacht).")
+        return  # Bricht das Event direkt ab
+
+    player_speed = base_speed * 2
+    ufo_sound.play()
+
+    def teleport_sheep():
+        for sheep in sheep_list:
+            sheep["x"] = random.randint(100, WIDTH - 100)
+            sheep["y"] = random.randint(100, HEIGHT - 100)
+            sheep["speed_boost"] = True
+
+            sheep["timer"] = {
+                "remaining": 10.0,
+                "active": False,
+                "last_tick_sound": 4
+}
+
+    teleport_sheep()
+    pygame.time.set_timer(pygame.USEREVENT + 1, 1000)
+    pygame.time.set_timer(pygame.USEREVENT + 2, 2000)
+    pygame.time.set_timer(pygame.USEREVENT + 3, 3000)
+
+
+def end_ufo_event():
+    global player_speed
+    player_speed = base_speed
+    for sheep in sheep_list:
+        sheep["speed_boost"] = False
+        if not sheep["following"]:
+            sheep["timer"]["remaining"] = get_default_timer(selected_difficulty)
+
+def start_storm_event():
+    global player_speed, storm_overlay, regen_sound, glide_friction
+    if night_mode:
+        print("Sturm Event geblockt (Nacht).")
+        return
+
+    pygame.mixer.music.stop()
+    vogel_sound.stop()
+    regen_sound = pygame.mixer.Sound("./media/game/images/events/regen/regen.wav")
+    regen_sound.set_volume(0.3)
+    regen_sound.play(-1)
+    storm_overlay = True
+
+def end_storm_event():
+    global player_speed, storm_overlay, regen_sound
+    global storm_steuerung_rutschig
+    storm_steuerung_rutschig = False
+    player_speed = base_speed
+    storm_overlay = False
+    if regen_sound:
+        regen_sound.stop()
+    pygame.mixer.music.play(-1)
+    vogel_sound.play(-1)
+
+#! Weitere extras für das Sturm Event
+
+player_velocity = pygame.Vector2(0, 0)  # Aktuelle Bewegung
+glide_friction = 0.4  # Gleit-Faktor (je höher, desto weniger rutschen)
+
+
+#! Dictionaries für Available Events etc
+
+available_events = {
+    "ufo": {
+        "start": start_ufo_event,
+        "end": end_ufo_event,
+        "chance": 0.0002,
+        "day_only": True
+    },
+    "storm": {
+        "start": start_storm_event,
+        "end": end_storm_event,
+        "chance": 0.0002,
+        "day_only": True
+    }
+}
+
+storm_overlay = False
+
+#? ----------------------
+#? Ufo Event
+#? ----------------------
+
+#? UFO Event Variablen
 event_active = False
 event_timer = 0.0
 event_duration = 15.0
@@ -507,8 +600,28 @@ ufo_sound.set_volume(0.5)
 teleport_sound = pygame.mixer.Sound("./media/game/images/events/ufo/teleport.wav")
 teleport_sound.set_volume(0.5)
 
+# ----------------------
 
+#? ----------------------
+#? Regen Event
+#? ----------------------
 
+#? Regen Event Variablen
+
+#? Sturm Event UI
+storm_img = pygame.image.load("./media/game/images/events/regen/regenwolke.png").convert_alpha()
+w, h = storm_img.get_size()
+storm_img = pygame.transform.scale(storm_img, (int(w * 0.1), int(h * 0.1)))
+
+storm_sound = pygame.mixer.Sound("./media/game/images/events/regen/regen.wav")
+storm_sound.set_volume(0.4)
+
+storm_wolken = [
+    {"x": 150, "y": 30},
+    {"x": WIDTH - 200, "y": 20}
+]
+
+storm_steuerung_rutschig = False
 
 #^ --------------------------
 #^  Die Uhr laden / über stalltiere
@@ -1032,32 +1145,53 @@ while running:
         # Wolf Movement (Diagonal)
         keys = pygame.key.get_pressed()
         dx, dy = 0, 0
+        desired = pygame.Vector2(0, 0)
         direction_for_render = "down"
 
         if keys[pygame.K_w] or keys[pygame.K_UP]:
-            dy = -player_speed
+            desired.y = -1
             direction_for_render = "up"
         if keys[pygame.K_s] or keys[pygame.K_DOWN]:
-            dy = player_speed
+            desired.y = 1
             direction_for_render = "down"
         if keys[pygame.K_a] or keys[pygame.K_LEFT]:
-            dx = -player_speed
+            desired.x = -1
             direction_for_render = "left"
         if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
-            dx = player_speed
+            desired.x = 1
             direction_for_render = "right"
 
-        moving_now = dx != 0 or dy != 0 #! Laufsounds
-        if moving_now and not is_walking:
-            dog_walk_sound.play(-1)  # 🐾 leiser Loop
-            is_walking = True
-        elif not moving_now and is_walking:
-            dog_walk_sound.stop()
-            is_walking = False
+        # Normalize Richtung
+        if desired.length() > 0:
+            desired = desired.normalize()
 
-
-        # aktuelles Bild holen, um Größe zu prüfen
+        # Bildgröße holen für Kollision
         current_img = player_sprites[direction_for_render]
+        width, height = current_img.get_width(), current_img.get_height()
+
+        # Neue Position berechnen je nach Steuerung
+        if storm_steuerung_rutschig:
+            player_velocity += desired * player_speed * 0.3  # Rutschiger Boost
+            player_velocity *= glide_friction
+            future_x = player_x + player_velocity.x
+            future_y = player_y + player_velocity.y
+        else:
+            player_velocity = desired * player_speed
+            future_x = player_x + player_velocity.x
+            future_y = player_y + player_velocity.y
+
+        # Neue Hitbox
+        future_rect = pygame.Rect(future_x, future_y, width, height)
+
+        # Kollision mit Stall verhindern
+        if not (stall_rect and future_rect.colliderect(block_zone)):
+            player_x = future_x
+            player_y = future_y
+
+        # Begrenzung auf Bildschirm
+        player_x = max(0, min(player_x, WIDTH - width))
+        player_y = max(0, min(player_y, HEIGHT - height))
+
 
         # neue Position vorschauen & prüfen ob sie mit Stall kollidiert
         future_rect = pygame.Rect(player_x + dx, player_y + dy, current_img.get_width(), current_img.get_height())
@@ -1287,53 +1421,43 @@ while running:
 
         # Zeit Tag->Nacht, ab 22:00 => night
         if game_minutes < 1320:
-            if not event_active:  # Zeit bleibt stehen während des Events
+            if not event_active:
                 time_accum += dt_s
                 if time_accum >= 1.0:
                     game_minutes += 1
-                    time_accum -= 1.0
-                if game_minutes >= 1320: #^ Wenn 22 Uhr -> Nacht startet
+                    time_accum = 0.0
+                if game_minutes >= 1320:
                     game_minutes = 1320
                     night_mode = True
                     time_accum = 0.0
-                    stall_placed = False #^ Damit der Stall wieder neu platziert wird
-            #! UFO EVENT!
-            if not night_mode and not event_active and 1140 <= game_minutes < 1320 and random.random() < 0.0002: #* Ufo event Wahrscheinlichkeit [UFOWSKbearb]
-                event_active = True
-                event_type = "ufo"
-                event_timer = event_duration
-                player_speed = base_speed * 2
-                ufo_sound.play()
+                    stall_placed = False
 
-                def teleport_sheep():
-                    for sheep in sheep_list:
-                        sheep["x"] = random.randint(100, WIDTH - 100)
-                        sheep["y"] = random.randint(100, HEIGHT - 100)
-                        sheep["speed_boost"] = True
-                        sheep["timer"]["remaining"] = 10.0
-                        sheep["timer"]["active"] = False
-                    teleport_sound.play()
+            # Event-Auswahl
+            if not night_mode and not event_active and 1140 <= game_minutes < 1320:
+                for name, info in available_events.items():
+                    if info.get("day_only", False) and random.random() < info["chance"]:
+                        event_type = name
+                        event_active = True
+                        event_timer = event_duration
+                        info["start"]()
+                        break  # nur ein Event pro Loop
 
-                teleport_sheep()  # sofort
-                pygame.time.set_timer(pygame.USEREVENT + 1, 1000)
-                pygame.time.set_timer(pygame.USEREVENT + 2, 2000)
-                pygame.time.set_timer(pygame.USEREVENT + 3, 3000)
-
+            # Event läuft
             if event_active:
                 event_timer -= dt_s
 
-                # Während des Events zufällig teleportieren (selten)
-                if random.random() < 0.003:
-                    teleport_sheep()
+                # Event-spezifische Logik (z. B. UFO teleport)
+                if event_type == "ufo" and random.random() < 0.003:
+                    for sheep in sheep_list:
+                        sheep["x"] = random.randint(100, WIDTH - 100)
+                        sheep["y"] = random.randint(100, HEIGHT - 100)
+                        teleport_sound.play()
 
+                # Event vorbei
                 if event_timer <= 0:
+                    available_events[event_type]["end"]()
                     event_active = False
                     event_type = None
-                    player_speed = base_speed
-                    for sheep in sheep_list:
-                        sheep["speed_boost"] = False
-                        if not sheep["following"]:  # nur wenn Schaf gerade NICHT folgt
-                            sheep["timer"]["remaining"] = get_default_timer(selected_difficulty)
 
                     #^ Nacht startet Text
                     score_popups.append({
@@ -1821,6 +1945,17 @@ while running:
         if event_active and event_type == "ufo":
             screen.blit(ufo_img, (500, 40))  # weiter links
             screen.blit(ufo_text, (WIDTH // 2 - ufo_text.get_width() // 2 + 60, 55))
+
+        if storm_overlay:
+            gray_overlay = pygame.Surface((WIDTH, HEIGHT))
+            gray_overlay.fill((80, 80, 80))  # ← dunkleres Grau statt 120,120,120
+            gray_overlay.set_alpha(120)     # ← höherer Alpha für mehr "Nebeleffekt"
+            screen.blit(gray_overlay, (0, 0))
+
+            screen.blit(storm_img, (80, 40))
+            screen.blit(storm_img, (WIDTH - storm_img.get_width() - 80, 40))
+
+
 
 
         #! -----------------------------------------
