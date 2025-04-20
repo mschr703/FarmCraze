@@ -21,9 +21,12 @@ import webbrowser
 #* Hauptmenü
 # [PPA] - Ping-Pong Animationsgeschwindigkeit
 # -----            
-#* Powerups:
+#* Powerups & Snacks:
 # [PKTbearb] - Pull range von dem Magnet Powerup
 # [SCBbearb] - Score Bonus durch den Score Powerup
+# [SNPIbearb] - Snack Spawn Intervall
+# [SNTC] - Snack Toxic Chance
+# [PUTIbearb] - Despawn Zeit der Powerups
 # ----- 
 #* Tiere:
 # [SAT1bearb] & [SAT2bearb] - Um den Timer von den Schafen zu verändern (beide müssen gleich geändert werden)
@@ -240,6 +243,28 @@ schwer_rect = btn_schwer.get_rect(center=(WIDTH // 2, diff_start_y + 2 * diff_sp
 selected_difficulty = None
 
 #^ ------------------------------------------------------------
+#^ Kleine "Verbrauchs"-Items
+#^ ------------------------------------------------------------
+
+#^ SNACKS 
+
+snack_images = {
+    "healthy": pygame.transform.scale(
+        pygame.image.load("./media/game/images/snacks/Snack-healthy.png").convert_alpha(),
+        (64, 64)
+    ),
+    "toxic": pygame.transform.scale(
+        pygame.image.load("./media/game/images/snacks/Snack-toxic.png").convert_alpha(),
+        (64, 64)
+    ),
+}
+
+snack = None
+snack_spawn_timer = 0.0
+snack_spawn_interval = 30.0 #* [SNPIbearb]
+
+
+#^ ------------------------------------------------------------
 #^ Schaf (Deko im Menü)
 #^ ------------------------------------------------------------
 
@@ -339,6 +364,20 @@ powerup_sound = pygame.mixer.Sound("./media/game/sounds/effects/sonstiges/poweru
 powerup_sound.set_volume(0.5)
 
 #^ ------------------------------------------------------------
+#^ Geräusche für den Hund
+#^ ------------------------------------------------------------
+
+dog_eat_sound = pygame.mixer.Sound("./media/game/sounds/effects/animals/dog-eating.wav") # essen zb snacks
+dog_eat_sound.set_volume(0.5)
+
+dog_walk_sound = pygame.mixer.Sound("./media/game/sounds/effects/animals/dog-walking.wav") # beim laufen
+dog_walk_sound.set_volume(0.4)
+
+dog_bark_sound = pygame.mixer.Sound("./media/game/sounds/effects/animals/dog-barking.wav") # zufällig bellen
+dog_bark_sound.set_volume(0.6)
+
+
+#^ ------------------------------------------------------------
 #^ MAPS + Musik für Game-State
 #^ ------------------------------------------------------------
 map_paths = [
@@ -371,6 +410,7 @@ player_y = 300
 player_speed = 4
 player_direction = "down"
 tick = 0
+is_walking = False
 
 #^ -------------------------
 #^ Schaf mit 4 einzelbildern
@@ -503,6 +543,9 @@ while running:
     dt = clock.tick(fps)
     dt_s = dt / 1000.0
     tick += 1
+    #! Random Bellen des Hundes
+    if random.random() < 0.002:  # Wahrscheinlichkeit pro Frame (~0.2%)
+        dog_bark_sound.play()
     #! — Power‑Up‑Spawn —
     powerup_spawn_timer += dt_s
     if powerup_spawn_timer >= powerup_spawn_interval:
@@ -513,9 +556,21 @@ while running:
         powerups.append({
             "type": pu_type,
             "x": pu_x,
-            "y": pu_y,
-            "timer": 7.0  #? 7 Sekunden Zeit zum einsammeln vom Powerups
+            "y": pu_y, #? 7 Sekunden Zeit zum einsammeln vom Powerups
+            "timer": 7.0  #* [PUTIbearb]
         })
+    #! - Snack Spawn -
+    snack_spawn_timer += dt_s
+    if snack is None and snack_spawn_timer >= snack_spawn_interval:
+        snack_spawn_timer = 0.0
+        snack = {
+            "x": random.randint(100, WIDTH - 100),
+            "y": random.randint(100, HEIGHT - 100),
+            "type": "healthy",
+            "timer": 15.0,
+            "transformed": False
+        }
+
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -945,6 +1000,15 @@ while running:
         if keys[pygame.K_d] or keys[pygame.K_RIGHT]:
             dx = player_speed
             direction_for_render = "right"
+
+        moving_now = dx != 0 or dy != 0 #! Laufsounds
+        if moving_now and not is_walking:
+            dog_walk_sound.play(-1)  # 🐾 leiser Loop
+            is_walking = True
+        elif not moving_now and is_walking:
+            dog_walk_sound.stop()
+            is_walking = False
+
 
         # aktuelles Bild holen, um Größe zu prüfen
         current_img = player_sprites[direction_for_render]
@@ -1572,6 +1636,72 @@ while running:
                 elif active_powerup == "freeze":
                     freeze_active = False
                 active_powerup = None
+
+        # — Snack zeichnen und verarbeiten —
+        if snack:
+            snack["timer"] -= dt_s
+
+            # Spieler in der Nähe => Chance auf Transformation
+            if not snack["transformed"]:
+                dist_x = abs(player_x - snack["x"])
+                dist_y = abs(player_y - snack["y"])
+                distance = math.hypot(player_x - snack["x"], player_y - snack["y"])
+                if distance < 120 and not snack["transformed"]: #! Hier kann man die reveal distanz verändern, indem der snack als toxic zeigt
+                    if random.random() < 0.5: #* Snack toxic chance [SNTC]
+                        snack["type"] = "toxic"
+                    snack["transformed"] = True
+
+
+            # Snack-Rect & Kollisionsprüfung
+            snack_img = snack_images[snack["type"]]
+            snack_rect = pygame.Rect(snack["x"], snack["y"], snack_img.get_width(), snack_img.get_height())
+
+            if snack_rect.colliderect(player_rect):
+                if snack["type"] == "healthy":
+                    coins += 2
+                    score += 1
+                    dog_eat_sound.play() # sound fürs essen
+                    score_popups.append({ # popup text -> "+2 Münzen"
+                        "x": player_x + 30,
+                        "y": player_y - 20,
+                        "alpha": 255,
+                        "timer": {
+                            "remaining": 2.0,
+                            "active": False,
+                            "last_tick_sound": 4
+                        },
+                        "text": "+2 Coins +1 Score!",
+                        "color": (255, 255, 100)
+                    })
+                else:
+                    lives -= 1
+                    cancel_sound.play()
+                    score_popups.append({
+                        "x": player_x,
+                        "y": player_y - 30,
+                        "alpha": 255,
+                        "timer": {
+                            "remaining": 2.0,
+                            "active": False,
+                            "last_tick_sound": 4
+                        },
+                        "text": "Ihh, vergiftet!",
+                        "color": (255, 0, 0)
+                    })
+                    if lives <= 0:
+                        game_over = True
+                        pygame.mixer.music.stop()
+
+                snack = None
+                snack_spawn_timer = 0.0
+
+            elif snack["timer"] <= 0:
+                snack = None
+                snack_spawn_timer = 0.0
+
+            else:
+                screen.blit(snack_img, (snack["x"], snack["y"]))
+
 
         # — Delivery‑Zone leicht highlighten —
         highlight_surf = pygame.Surface(
