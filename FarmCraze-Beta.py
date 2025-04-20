@@ -705,6 +705,9 @@ while running:
                 chosen_map_base = None
                 night_mode = False
                 fade_in = False
+                event_active = False
+                event_type = None
+
 
                 # Tages‑ und Zeit‑Zähler
                 current_day = 1
@@ -1283,8 +1286,8 @@ while running:
                 sheep_currently_following = None
 
         # Zeit Tag->Nacht, ab 22:00 => night
-        if not night_mode:
-            if game_minutes < 1320:
+        if game_minutes < 1320:
+            if not event_active:  # Zeit bleibt stehen während des Events
                 time_accum += dt_s
                 if time_accum >= 1.0:
                     game_minutes += 1
