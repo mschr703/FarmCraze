@@ -26,6 +26,7 @@ import webbrowser
 # [SCBbearb] - Score Bonus durch den Score Powerup
 # [SNPIbearb] - Snack Spawn Intervall
 # [SNTC] - Snack Toxic Chance
+# [SNCKprob] - probability das der snack toxic wird je nach schwierigkeit
 # [PUTIbearb] - Despawn Zeit der Powerups
 # ----- 
 #* Tiere:
@@ -262,6 +263,14 @@ snack_images = {
 snack = None
 snack_spawn_timer = 0.0
 snack_spawn_interval = 30.0 #* [SNPIbearb]
+
+#* [SNCKprob] Wahrscheinlichkeit für toxische Snacks je nach Schwierigkeit
+snack_toxic_chances = {
+    "Leicht": 0.20,   # 20 %
+    "Mittel": 0.35,   # 35 %
+    "Schwer": 0.55    # 55 %
+}
+
 
 
 #^ ------------------------------------------------------------
@@ -1646,8 +1655,9 @@ while running:
                 dist_x = abs(player_x - snack["x"])
                 dist_y = abs(player_y - snack["y"])
                 distance = math.hypot(player_x - snack["x"], player_y - snack["y"])
-                if distance < 120 and not snack["transformed"]: #! Hier kann man die reveal distanz verändern, indem der snack als toxic zeigt
-                    if random.random() < 0.5: #* Snack toxic chance [SNTC]
+                if distance < 130 and not snack["transformed"]:  # größere Range
+                    chance = snack_toxic_chances.get(selected_difficulty, 0.25)
+                    if random.random() < chance:
                         snack["type"] = "toxic"
                     snack["transformed"] = True
 
