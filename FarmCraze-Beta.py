@@ -32,6 +32,7 @@ import webbrowser
 # ----- 
 #* Events
 # [UFOWSKbearb] - Ufo Event Spawn Wahrscheinlichkeit
+# [GWSTEbearb] - Stärke des Gleitens/Rutschen beim Sturm Event
 # ----- 
 #* Tiere:
 # [SAT1bearb] - Timer der Schafe bearbeiten
@@ -142,6 +143,14 @@ else:
     new_size = (int(logo_rect_temp.width * 0.4), int(logo_rect_temp.height * 0.4))
     logo = pygame.transform.scale(logo, new_size)
 logo_rect = logo.get_rect(center=(WIDTH // 2, 150))
+
+#^ -----------------------
+#^ Font Einstellungen
+#^ -----------------------
+
+pixel_font_big = pygame.font.Font("./media/fonts/ByteBounce.ttf", 48)  # für große Überschriften
+pixel_font_small = pygame.font.Font("./media/fonts/ByteBounce.ttf", 28) # für kleine Texte (Events etc.)
+
 
 #^ -----------------------
 #^  ==== HUD Images ====
@@ -506,13 +515,10 @@ def start_ufo_event():
         for sheep in sheep_list:
             sheep["x"] = random.randint(100, WIDTH - 100)
             sheep["y"] = random.randint(100, HEIGHT - 100)
-            sheep["speed_boost"] = True
-
-            sheep["timer"] = {
-                "remaining": 10.0,
-                "active": False,
-                "last_tick_sound": 4
-}
+            sheep["timer"]["remaining"] = 10.0  # Timer Fix
+            sheep["timer"]["active"] = False
+            sheep["timer"]["last_tick_sound"] = 4
+            sheep["speed_boost"] = True  # Speed boost fix
 
     teleport_sheep()
     pygame.time.set_timer(pygame.USEREVENT + 1, 1000)
@@ -540,6 +546,7 @@ def start_storm_event():
     regen_sound.set_volume(0.3)
     regen_sound.play(-1)
     storm_overlay = True
+    storm_steuerung_rutschig = True
 
 def end_storm_event():
     global player_speed, storm_overlay, regen_sound
@@ -555,7 +562,7 @@ def end_storm_event():
 #! Weitere extras für das Sturm Event
 
 player_velocity = pygame.Vector2(0, 0)  # Aktuelle Bewegung
-glide_friction = 0.4  # Gleit-Faktor (je höher, desto weniger rutschen)
+glide_friction = 0.92 #* Gleitwiderstand Sturm Event [GWSTEbearb]
 
 
 #! Dictionaries für Available Events etc
@@ -577,6 +584,14 @@ available_events = {
 
 storm_overlay = False
 
+# ! Event timer Variablen (Timer bevor ein event startet) "Ein event baaut sich auf..."
+
+pre_event_timer_active = False
+pre_event_timer = 0.0
+
+event_description_lines = []
+
+
 #? ----------------------
 #? Ufo Event
 #? ----------------------
@@ -590,7 +605,6 @@ event_type = None
 #? UFO Event UI
 ufo_img = pygame.image.load("./media/game/images/events/ufo/ufo.png").convert_alpha()
 ufo_img = pygame.transform.scale_by(ufo_img, 0.1)  # ggf. anpassen
-ufo_text = pixel_font.render("UFO-Sichtung! Schafe rasten aus!", True, (100, 255, 100))
 
 #? Sound beim Start des UFO-Events
 ufo_sound = pygame.mixer.Sound("./media/game/images/events/ufo/ufo-landing.wav")
@@ -608,10 +622,20 @@ teleport_sound.set_volume(0.5)
 
 #? Regen Event Variablen
 
+#? Regentropfen
+raindrops = []  # Liste für Tropfen
+for _ in range(100):  # Anzahl Tropfen
+    raindrops.append({
+        "x": random.randint(0, WIDTH),
+        "y": random.randint(0, HEIGHT),
+        "speed": random.uniform(2.0, 5.0)
+    })
+
+
 #? Sturm Event UI
 storm_img = pygame.image.load("./media/game/images/events/regen/regenwolke.png").convert_alpha()
 w, h = storm_img.get_size()
-storm_img = pygame.transform.scale(storm_img, (int(w * 0.1), int(h * 0.1)))
+storm_img = pygame.transform.scale(storm_img, (int(w * 0.3), int(h * 0.3)))
 
 storm_sound = pygame.mixer.Sound("./media/game/images/events/regen/regen.wav")
 storm_sound.set_volume(0.4)
@@ -703,9 +727,36 @@ running = True #? Ab hier beginnt die Main game loop
 #? ----------------------------------------------------------------------------------
 
 while running:
+    #* Wichtige Variablen
     dt = clock.tick(fps)
     dt_s = dt / 1000.0
     tick += 1
+
+    #! Pre Event timer
+    if pre_event_timer_active:
+        pre_event_timer -= dt_s
+        if pre_event_timer <= 0:
+            # Wenn fertig -> Event wirklich starten
+            event_active = True
+            event_timer = event_duration
+            available_events[event_type]["start"]()
+
+            # Je nach Event passende Beschreibungen setzen:
+            if event_type == "ufo":
+                event_description_lines = [
+                    "- Die Aliens teleportieren deine Schafe zufällig wild umher",
+                    "- Du hast einen Speed-Bonus",
+                    "- Sammle sie schnellstmöglich ein!"
+                ]
+            elif event_type == "storm":
+                event_description_lines = [
+                    "- Es fängt an zu regnen",
+                    "- Deine Steuerung wird rutschig",
+                    "- Halte dich von Wölfen fern!"
+                ]
+
+            pre_event_timer_active = False
+
     #! Random Bellen des Hundes
     if random.random() < 0.002:  # Wahrscheinlichkeit pro Frame (~0.2%)
         dog_bark_sound.play()
@@ -1124,8 +1175,9 @@ while running:
                         "y": y,
                         "direction": "up",
                         "following": False,
+                        "speed_boost": event_active and event_type == "ufo",
                         "timer": {
-                            "remaining": 10.0 if event_active else get_default_timer(selected_difficulty),
+                            "remaining": 10.0 if event_active and event_type == "ufo" else get_default_timer(selected_difficulty),
                             "active": False,
                             "last_tick_sound": 4
                         },
@@ -1164,6 +1216,11 @@ while running:
         # Normalize Richtung
         if desired.length() > 0:
             desired = desired.normalize()
+            if not dog_walk_sound.get_num_channels():
+                dog_walk_sound.play(-1)  # Loop beim Laufen
+        else:
+            dog_walk_sound.stop()  # Wenn kein Laufen → stoppen
+
 
         # Bildgröße holen für Kollision
         current_img = player_sprites[direction_for_render]
@@ -1215,7 +1272,7 @@ while running:
             # ---------------- Timer Initialisieren ----------------
             if "timer" not in sheep or type(sheep["timer"]) != dict:
                 sheep["timer"] = {
-                    "remaining": 10.0 if event_active else get_default_timer(selected_difficulty),
+                    "remaining": 10.0 if event_active and event_type == "ufo" else get_default_timer(selected_difficulty),
                     "active": False,
                     "last_tick_sound": 4
     }
@@ -1305,8 +1362,9 @@ while running:
                             "y": new_y,
                             "direction": "up",
                             "following": False,
+                            "speed_boost": event_active and event_type == "ufo",
                             "timer": {
-                                "remaining": 10.0 if event_active else get_default_timer(selected_difficulty),
+                                "remaining": 10.0 if event_active and event_type == "ufo" else get_default_timer(selected_difficulty),
                                 "active": False,
                                 "last_tick_sound": 4
                             },
@@ -1406,8 +1464,9 @@ while running:
                                 "y": new_y,
                                 "direction": "up",
                                 "following": False,
+                                "speed_boost": event_active and event_type == "ufo",
                                 "timer": {
-                                    "remaining": 10.0 if event_active else get_default_timer(selected_difficulty),
+                                    "remaining": 10.0 if event_active and event_type == "ufo" else get_default_timer(selected_difficulty),
                                     "active": False,
                                     "last_tick_sound": 4
                                 },
@@ -1433,14 +1492,13 @@ while running:
                     stall_placed = False
 
             # Event-Auswahl
-            if not night_mode and not event_active and 1140 <= game_minutes < 1320:
+            if not night_mode and not event_active and not pre_event_timer_active and 1140 <= game_minutes < 1320:
                 for name, info in available_events.items():
                     if info.get("day_only", False) and random.random() < info["chance"]:
                         event_type = name
-                        event_active = True
-                        event_timer = event_duration
-                        info["start"]()
-                        break  # nur ein Event pro Loop
+                        pre_event_timer_active = True
+                        pre_event_timer = 3.0
+                        break  # nur ein Event vorbereiten
 
             # Event läuft
             if event_active:
@@ -1451,6 +1509,7 @@ while running:
                     for sheep in sheep_list:
                         sheep["x"] = random.randint(100, WIDTH - 100)
                         sheep["y"] = random.randint(100, HEIGHT - 100)
+                        sheep["timer"]["remaining"] = 10.0 # nach dem teleport wieder auf 10 sek setzen
                         teleport_sound.play()
 
                 # Event vorbei
@@ -1459,56 +1518,56 @@ while running:
                     event_active = False
                     event_type = None
 
-                    #^ Nacht startet Text
-                    score_popups.append({
-                        "x": WIDTH // 2,
-                        "y": HEIGHT // 2 - 150,
-                        "alpha": 255,
-                        "timer": {
-                            "remaining": 3.0,
-                            "active": False,
-                            "last_tick_sound": 4
-                        },
-                        "text": "Die Nacht beginnt!",
-                        "color": (180, 180, 180)  # Hellgrau
-                    })
+                    # **Nur wenn es schon Nacht ist, Nachtlogik triggern:**
+                    if game_minutes >= 1320:
+                        if not night_mode:
+                            night_mode = True
+                            score_popups.append({
+                                "x": WIDTH // 2,
+                                "y": HEIGHT // 2 - 150,
+                                "alpha": 255,
+                                "timer": {
+                                    "remaining": 3.0,
+                                    "active": False,
+                                    "last_tick_sound": 4
+                                },
+                                "text": "Die Nacht beginnt!",
+                                "color": (180, 180, 180)
+                            })
 
-                    #^ Wechsle Map zur Night-Version
-                    night_map = chosen_map_base + "-night.png"
-                    if os.path.exists(night_map):
-                        loaded_map = pygame.image.load(night_map).convert()
-                        map_surface = pygame.transform.scale(loaded_map, (WIDTH, HEIGHT))
-                        print(f"Nacht-Map '{night_map}' geladen.")
-                    else:
-                        print(f"Night-Map '{night_map}' nicht gefunden, bleibe bei Day-Map ...")
+                            # Map auf Nacht wechseln
+                            night_map = chosen_map_base + "-night.png"
+                            if os.path.exists(night_map):
+                                loaded_map = pygame.image.load(night_map).convert()
+                                map_surface = pygame.transform.scale(loaded_map, (WIDTH, HEIGHT))
+                                print(f"Nacht-Map '{night_map}' geladen.")
+                            else:
+                                print(f"Night-Map '{night_map}' nicht gefunden, bleibe bei Day-Map ...")
 
-                    #^ Musik umschalten auf Nacht
-                    pygame.mixer.music.stop()
-                    if os.path.exists(night_music):
-                        pygame.mixer.music.load(night_music)
-                        pygame.mixer.music.play(-1)
-                    else:
-                        print(f"Night-Music '{night_music}' nicht gefunden, bleibe bei Day-Music ...")
+                            # Musik Nacht
+                            pygame.mixer.music.stop()
+                            if os.path.exists(night_music):
+                                pygame.mixer.music.load(night_music)
+                                pygame.mixer.music.play(-1)
 
-                    fade_in = True
-                    fade_alpha = 255
+                            fade_in = True
+                            fade_alpha = 255
 
-                    #^ markiere: Nacht hat gerade begonnen
-                    night_just_started = True
+                            night_just_started = True
 
-                    #^ code snippet für den wolf spawn
-                    if night_just_started:
-                        enemies.clear()
-                        for _ in range(4):
-                            ex = random.randint(100, WIDTH-100)
-                            ey = random.randint(100, HEIGHT-100)
-                            # jede Enemy bekommt eine zufällige Start‑Richtung
-                            direction = random.choice(["up","down","left","right"])
-                            enemies.append({
-                                "x": ex,
-                                "y": ey,
-                                "dir": direction,
-                                "timer": 0.0  # um das Wechsel‑Intervall zu tracken
+                        #^ code snippet für den wolf spawn
+                        if night_just_started:
+                            enemies.clear()
+                            for _ in range(4):
+                                ex = random.randint(100, WIDTH-100)
+                                ey = random.randint(100, HEIGHT-100)
+                                # jede Enemy bekommt eine zufällige Start‑Richtung
+                                direction = random.choice(["up","down","left","right"])
+                                enemies.append({
+                                    "x": ex,
+                                    "y": ey,
+                                    "dir": direction,
+                                    "timer": 0.0  # um das Wechsel‑Intervall zu tracken
                             })
 
         else:
@@ -1920,6 +1979,31 @@ while running:
         if stall_placed and stall_rect:
             screen.blit(stall_img, stall_rect)
 
+        # Pre event
+        if pre_event_timer_active:
+            pre_event_text = pixel_font_big.render("Ein Event braut sich zusammen...", True, DARK_GRAY)
+            pre_event_text = pygame.transform.rotate(pre_event_text, random.uniform(-0.5, 0.5))
+            pre_event_rect = pre_event_text.get_rect(center=(WIDTH // 2, 150))
+            screen.blit(pre_event_text, pre_event_rect)
+
+        if event_active and event_description_lines:
+            if event_type == "ufo":
+                event_title_text = pixel_font_big.render("UFO Sichtung! Die Schafe rasten aus!", True, (100, 255, 100))
+            elif event_type == "storm":
+                event_title_text = pixel_font_big.render("Es stürmt!", True, (100, 200, 255))
+
+            event_title_rotated = pygame.transform.rotate(event_title_text, random.uniform(-0.7, 0.7))  
+            event_title_rect = event_title_rotated.get_rect(center=(WIDTH // 2, 150))
+            screen.blit(event_title_rotated, event_title_rect)
+
+
+            # jetzt die beschreibung zeilenweise rendern
+            for i, line in enumerate(event_description_lines):
+                desc_text = pixel_font_small.render(line, True, (180, 180, 180))
+                desc_rect = desc_text.get_rect(center=(WIDTH // 2, 200 + i * 35))
+                screen.blit(desc_text, desc_rect)
+
+
         # Fade
         if fade_in:
             fade_surf = pygame.Surface((WIDTH, HEIGHT))
@@ -1944,9 +2028,15 @@ while running:
         #? Ufo Event
         if event_active and event_type == "ufo":
             screen.blit(ufo_img, (500, 40))  # weiter links
-            screen.blit(ufo_text, (WIDTH // 2 - ufo_text.get_width() // 2 + 60, 55))
+
 
         if storm_overlay:
+            for drop in raindrops:
+                pygame.draw.line(screen, (180, 180, 255), (drop["x"], drop["y"]), (drop["x"], drop["y"] + 5), 1)
+                drop["y"] += drop["speed"]
+                if drop["y"] > HEIGHT:
+                    drop["y"] = 0
+                    drop["x"] = random.randint(0, WIDTH)
             gray_overlay = pygame.Surface((WIDTH, HEIGHT))
             gray_overlay.fill((80, 80, 80))  # ← dunkleres Grau statt 120,120,120
             gray_overlay.set_alpha(120)     # ← höherer Alpha für mehr "Nebeleffekt"
