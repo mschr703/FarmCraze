@@ -535,7 +535,7 @@ def end_ufo_event():
             sheep["timer"]["remaining"] = get_default_timer(selected_difficulty)
 
 def start_storm_event():
-    global player_speed, storm_overlay, regen_sound, glide_friction
+    global player_speed, storm_overlay, regen_sound, glide_friction, storm_steuerung_rutschig
     if night_mode:
         print("Sturm Event geblockt (Nacht).")
         return
@@ -1228,14 +1228,13 @@ while running:
 
         # Neue Position berechnen je nach Steuerung
         if storm_steuerung_rutschig:
-            player_velocity += desired * player_speed * 0.3  # Rutschiger Boost
-            player_velocity *= glide_friction
+            player_velocity += desired * player_speed * 0.2  # langsamer beschleunigen
+            player_velocity *= glide_friction  # "Reibung" verringern
             future_x = player_x + player_velocity.x
             future_y = player_y + player_velocity.y
         else:
-            player_velocity = desired * player_speed
-            future_x = player_x + player_velocity.x
-            future_y = player_y + player_velocity.y
+            future_x = player_x + desired.x * player_speed
+            future_y = player_y + desired.y * player_speed
 
         # Neue Hitbox
         future_rect = pygame.Rect(future_x, future_y, width, height)
