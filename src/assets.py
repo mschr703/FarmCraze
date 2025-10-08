@@ -2,30 +2,29 @@ import pygame
 import os
 from . import settings
 
-class Assets:
-    """Eine Klasse zum Laden und Verwalten aller Spiel-Assets."""
+#* Diese Datei ist zuständig für die Assets im Spiel
+
+class Assets: #! Eine Klasse für die Farmcraze Spiel assets
     def __init__(self):
-        # Fonts
+        #? Fonts
         self.pixel_font_big = self._load_font(settings.FONT_BYTEBOUNCE, 48)
         self.pixel_font_small = self._load_font(settings.FONT_BYTEBOUNCE, 28)
 
-        # Sounds
+        #? Sounds
         self.sounds = self._load_sounds()
         self._set_sound_volumes()
 
-        # Bilder
+        #? Bilder
         self.images = self._load_images()
 
-    def _load_font(self, path, size):
-        """Lädt eine Schriftart oder eine System-Fallback-Schriftart."""
+    def _load_font(self, path, size): #! Font-download mit fallback
         try:
             return pygame.font.Font(path, size)
         except pygame.error:
             print(f"WARNUNG: Schriftart '{path}' nicht gefunden. Nutze Fallback.")
             return pygame.font.SysFont("couriernew", size, bold=True)
 
-    def _load_sounds(self):
-        """Lädt alle Sound-Dateien in ein Dictionary."""
+    def _load_sounds(self): #! Lädt die sound dateien in ein dict
         return {
             "menu_music": settings.MENU_MUSIC_PATH,
             "day_music": settings.DAY_MUSIC_PATH,
@@ -46,16 +45,14 @@ class Assets:
             "regen": self._load_sound("./media/game/images/events/regen/regen.wav"),
         }
 
-    def _load_sound(self, path):
-        """Lädt eine einzelne Sound-Datei."""
+    def _load_sound(self, path): #! Lädt eine einzelnde sound datei
         try:
             return pygame.mixer.Sound(path)
         except pygame.error:
             print(f"WARNUNG: Sound '{path}' konnte nicht geladen werden.")
-            return None # Gibt None zurück, um Abstürze zu vermeiden
+            return None #? Gibt None zurück, um crashes zu vermeiden
 
-    def _set_sound_volumes(self):
-        """Setzt die Lautstärke für die geladenen Sounds."""
+    def _set_sound_volumes(self): #! Lautstärkeregler für sound dateien
         if self.sounds["vogel"]: self.sounds["vogel"].set_volume(0.4)
         if self.sounds["click"]: self.sounds["click"].set_volume(0.5)
         if self.sounds["cancel"]: self.sounds["cancel"].set_volume(0.6)
@@ -69,8 +66,7 @@ class Assets:
         if self.sounds["teleport"]: self.sounds["teleport"].set_volume(0.5)
         if self.sounds["regen"]: self.sounds["regen"].set_volume(0.3)
 
-    def _load_images(self):
-        """Lädt alle Bild-Dateien in ein Dictionary."""
+    def _load_images(self): #! Lädt ein dict für die images
         images = {
             "icon": self._load_image(settings.ICON_PATH),
             "logo": self._load_image(settings.LOGO_PATH, scale_by=0.4),
@@ -86,8 +82,8 @@ class Assets:
             "storm_cloud": self._load_image("./media/game/images/events/regen/regenwolke.png", scale_by=0.3),
         }
 
-        # Manuelles Laden der Spieler-Sprites, um die deutschen Dateinamen
-        # den englischen Logik-Namen zuzuordnen.
+        #* Manuelles Laden der Spieler-Sprites, um die deutschen Dateinamen
+        #* den englischen Logik-Namen zuzuordnen.
         images["player"] = {
             "up": self._load_image("./media/game/sprites/player/oben.png", scale_by=settings.PLAYER_SCALE),
             "down": self._load_image("./media/game/sprites/player/unten.png", scale_by=settings.PLAYER_SCALE),
@@ -95,8 +91,7 @@ class Assets:
             "right": self._load_image("./media/game/sprites/player/rechts.png", scale_by=settings.PLAYER_SCALE)
         }
         
-        # --- ANPASSUNG HIER ---
-        # Manuelles Laden der Schaf-Sprites aus dem gleichen Grund.
+        #* gleicher grund wie oben ^ für die schaf sprites
         images["sheep"] = {
             "up": self._load_image("./media/game/sprites/sheep/oben.png", scale_by=settings.SHEEP_SCALE),
             "down": self._load_image("./media/game/sprites/sheep/unten.png", scale_by=settings.SHEEP_SCALE),
@@ -106,7 +101,7 @@ class Assets:
 
         images["enemy"] = self._load_sprite_sheet("./media/game/sprites/enemy/", {"left": "wolf-left.png", "right": "wolf-right.png"}, settings.ENEMY_SCALE)
         
-        # Power-ups und Snacks
+        #* Power-ups und Snacks
         images["powerups"] = self._load_sprite_sheet("./media/game/images/powerups/powerups-day/", {
             "speed": "powerup-speed.png", "magnet": "powerup-magnet.png", "score10": "powerup-10.png",
             "freeze": "powerup-freeze.png", "random": "powerup-random.png"
@@ -117,8 +112,7 @@ class Assets:
         }
         return images
 
-    def _load_image(self, path, scale_by=None):
-        """Lädt ein einzelnes Bild und skaliert es optional."""
+    def _load_image(self, path, scale_by=None): #! Lädt ein einzelnes bild
         try:
             img = pygame.image.load(path).convert_alpha()
             if scale_by:
@@ -127,17 +121,15 @@ class Assets:
             return img
         except pygame.error as e:
             print(f"FEHLER: Bild '{path}' konnte nicht geladen werden. Fehler: {e}")
-            # Programm beenden, da fehlende Bilder kritisch sind
+            #* Programm beenden, wenn kritische bilder vorhanden sind
             pygame.quit()
             raise SystemExit()
 
 
-    def _load_image_list(self, paths, scale_by=None):
-        """Lädt eine Liste von Bildern."""
+    def _load_image_list(self, paths, scale_by=None): #! Lädt eine liste von Bildern
         return [self._load_image(path, scale_by) for path in paths]
 
-    def _load_animation_frames(self, folder_path):
-        """Lädt alle Frames aus einem Ordner für eine Animation."""
+    def _load_animation_frames(self, folder_path): #! animations-frames
         frames = []
         if not os.path.exists(folder_path):
             print(f"WARNUNG: Animations-Ordner '{folder_path}' nicht gefunden.")
@@ -151,8 +143,7 @@ class Assets:
                 frames.append(img)
         return frames
 
-    def _load_sprite_sheet(self, folder, names, scale):
-        """Lädt Sprites für eine Entität (z.B. Gegner)."""
+    def _load_sprite_sheet(self, folder, names, scale): #! Lädt entity sprites
         sprites = {}
         if isinstance(names, list): # Einfache Liste von Namen
             for name in names:
@@ -164,8 +155,7 @@ class Assets:
                 sprites[name] = self._load_image(path, scale_by=scale)
         return sprites
 
-    def load_map(self, map_base_path, is_night):
-        """Lädt die Tag- oder Nacht-Version einer Karte."""
+    def load_map(self, map_base_path, is_night): #! Lädt maps (day/night)
         suffix = "-night.png" if is_night else "-day.png"
         map_path = map_base_path + suffix
         if os.path.exists(map_path):
@@ -173,8 +163,8 @@ class Assets:
             loaded_map = pygame.image.load(map_path).convert()
             return pygame.transform.scale(loaded_map, (settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT))
         else:
-            print(f"WARNUNG: Karte '{map_path}' nicht gefunden. Nutze Fallback.")
-            # Fallback auf die Tag-Karte, wenn die Nacht-Karte fehlt
+            print(f"WARNUNG: Karte '{map_path}' nicht gefunden. Nutze Fallback.") #! falls fehler mit map loading
+            #! FALLBACK AUF NACHT KARTE
             if is_night:
                 return self.load_map(map_base_path, False)
             return pygame.Surface((settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT))

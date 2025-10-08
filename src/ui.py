@@ -2,10 +2,11 @@ import pygame
 import webbrowser
 import random
 import math
-from . import settings # <-- Anpassung hier
+from . import settings
 
-class Button:
-    """Eine Klasse für klickbare Buttons im Menü."""
+#* Diese Datei ist für die UI Elemente verantwortlich
+
+class Button: #! Klasse für die klickbaren menü buttons
     def __init__(self, pos, size, image_normal, image_hover, on_click, sound_player):
         self.rect = pygame.Rect(pos, size)
         self.rect.center = pos
@@ -15,25 +16,22 @@ class Button:
         self.sound_player = sound_player
         self.is_hovered = False
 
-    def handle_event(self, event):
-        """Verarbeitet Mauseingaben für den Button."""
-        if event.type == pygame.MOUSEMOTION:
-            self.is_hovered = self.rect.collidepoint(event.pos)
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.is_hovered:
+    def update_hover(self, virtual_mouse_pos): #! aktualisiert den hover zustand
+        self.is_hovered = self.rect.collidepoint(virtual_mouse_pos)
+
+    def handle_event(self, event): #! verarbeitet maus eingaben
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.is_hovered:
             self.sound_player()
             self.on_click()
 
-    def draw(self, surface):
-        """Zeichnet den Button."""
+    def draw(self, surface): #! zeichnet die buttons
         image_to_draw = self.image_hover if self.is_hovered else self.image_normal
         surface.blit(image_to_draw, self.rect)
         
-    def update_animation(self, offset):
-        """Aktualisiert die Y-Position für die Ping-Pong-Animation."""
+    def update_animation(self, offset): #! aktualisiert den y wert fü die ping pong anim
         self.rect.centery += offset
 
-class AnimatedObject:
-    """Ein animiertes Objekt für das Hauptmenü (Schaf, Hund)."""
+class AnimatedObject: #! animiertes schaf + animierter hund für das main screen
     def __init__(self, frames, start_x, start_y, speed, frame_delay=800):
         self.frames = frames
         self.x = start_x
@@ -48,7 +46,7 @@ class AnimatedObject:
         if self.x > settings.VIRTUAL_WIDTH:
             self.x = -self.frames[0].get_width()
         
-        self.animation_timer += dt * 1000 # in Millisekunden
+        self.animation_timer += dt * 1000 #! in Millisekunden
         if self.animation_timer >= self.frame_delay:
             self.frame_index = (self.frame_index + 1) % len(self.frames)
             self.animation_timer = 0
@@ -73,20 +71,19 @@ class PopupText(pygame.sprite.Sprite):
         else:
             self.image.set_alpha(int(self.alpha))
 
-def draw_hud(surface, assets, lives, score, coins):
-    """Zeichnet das Heads-Up Display (Leben, Score, Münzen)."""
-    # Score
+def draw_hud(surface, assets, lives, score, coins): #! heads up display (münzen, leben etc)
+    #? Score
     score_text = f"Score: {score}"
     score_surf = assets.pixel_font_big.render(score_text, True, settings.WHITE)
     surface.blit(score_surf, (40, 20))
 
-    # Leben
+    #? Leben
     heart_img = assets.images["heart_hud"]
     for i in range(lives):
         heart_x = settings.VIRTUAL_WIDTH - (heart_img.get_width() + 10) * (i + 1)
         surface.blit(heart_img, (heart_x, 20))
 
-    # Münzen
+    #? Münzen
     coin_img = assets.images["coin_hud"]
     coin_y = 20 + heart_img.get_height() + 10
     coin_x = settings.VIRTUAL_WIDTH - coin_img.get_width() - 40
@@ -95,17 +92,15 @@ def draw_hud(surface, assets, lives, score, coins):
     coins_rect = coins_surf.get_rect(midright=(coin_x - 10, coin_y + coin_img.get_height() // 2))
     surface.blit(coins_surf, coins_rect)
 
-def draw_time(surface, assets, current_day, game_minutes):
-    """Zeichnet die In-Game-Uhrzeit."""
-    hour = (game_minutes // 60) % 24
-    minute = game_minutes % 60
+def draw_time(surface, assets, current_day, game_minutes): #! Zeichnet die ingame uhrzeit
+    hour = int((game_minutes // 60) % 24)
+    minute = int(game_minutes % 60)
     time_str = f"Tag {current_day}: {hour:02d}:{minute:02d}"
     time_surf = assets.pixel_font_big.render(time_str, True, settings.WHITE)
     time_rect = time_surf.get_rect(midtop=(settings.VIRTUAL_WIDTH // 2, 10))
     surface.blit(time_surf, time_rect)
 
-def draw_glow(surface, rect, tick, is_night):
-    """Zeichnet einen leuchtenden Effekt unter einer Entität bei Nacht."""
+def draw_glow(surface, rect, tick, is_night): #! zeichnet den glow effekt bei entities nachts
     if is_night:
         radius = 35 + 5 * math.sin(tick / 10)
         glow_surface = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
@@ -113,9 +108,8 @@ def draw_glow(surface, rect, tick, is_night):
         glow_rect = glow_surface.get_rect(center=rect.center)
         surface.blit(glow_surface, glow_rect)
 
-def open_url(url):
-    """Öffnet eine URL im Standardbrowser."""
+def open_url(url): #! öffnet eine url im browser
     try:
         webbrowser.open(url)
     except Exception as e:
-        print(f"Fehler beim Öffnen der URL {url}: {e}")
+        print(f"Fehler beim Öffnen der URL {url}: {e}") #! Fehler beim öffnen

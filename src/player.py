@@ -1,11 +1,9 @@
 import pygame
-from . import settings # <-- Anpassung hier
+from . import settings
 
-class Player(pygame.sprite.Sprite):
-    """
-    Repräsentiert den Spieler (Wolf/Hund).
-    Verwaltet Bewegung, Darstellung und Kollisionen.
-    """
+#* Diese Datei kümmert sich um die Spieler Logik.
+
+class Player(pygame.sprite.Sprite): #! Spieler logik (collision/movement)
     def __init__(self, assets):
         super().__init__()
         self.assets = assets
@@ -21,20 +19,19 @@ class Player(pygame.sprite.Sprite):
         
         self.walk_sound_playing = False
 
-    def update(self, keys, block_zones):
-        """Aktualisiert die Spielerposition basierend auf Input und Kollision."""
+    def update(self, keys, block_zones): #! aktualisiert die spielerpos nach input
         desired_movement = self._get_desired_movement(keys)
         self._update_sound(desired_movement)
         
-        # Bewegung basierend auf Steuerung (normal vs. rutschig)
+        #! Bewegung basierend auf Steuerung (normal vs. rutschig)
         if self.is_slippery:
-            # Langsamere Beschleunigung und Gleiten
+            #! Langsamere Beschleunigung und Gleiten
             self.velocity += desired_movement * self.speed * 0.2
             self.velocity *= settings.PLAYER_GLIDE_FRICTION
         else:
             self.velocity = desired_movement * self.speed
 
-        # Zukünftige Position berechnen und auf Kollision prüfen
+        # !Zukünftige Position berechnen und auf Kollision prüfen
         future_rect = self.rect.move(self.velocity)
         
         collided = False
@@ -46,14 +43,14 @@ class Player(pygame.sprite.Sprite):
         if not collided:
             self.rect.move_ip(self.velocity)
 
-        # Spieler innerhalb der Bildschirmgrenzen halten
+        #! Spieler innerhalb der Bildschirmgrenzen halten
         self.rect.left = max(0, self.rect.left)
         self.rect.right = min(settings.VIRTUAL_WIDTH, self.rect.right)
         self.rect.top = max(0, self.rect.top)
         self.rect.bottom = min(settings.VIRTUAL_HEIGHT, self.rect.bottom)
 
     def _get_desired_movement(self, keys):
-        """Ermittelt die gewünschte Bewegungsrichtung aus den Tasten."""
+        #! Ermittelt die gewünschte Bewegungsrichtung aus den Tasten
         desired = pygame.Vector2(0, 0)
         if keys[pygame.K_w] or keys[pygame.K_UP]:
             desired.y = -1
@@ -68,15 +65,14 @@ class Player(pygame.sprite.Sprite):
             desired.x = 1
             self.direction = "right"
 
-        # Vektor normalisieren, um diagonale Bewegung nicht zu beschleunigen
+        #! Vektor normalisieren, um diagonale Bewegung nicht zu beschleunigen
         if desired.length() > 0:
             desired.normalize_ip()
             
         self.image = self.images[self.direction]
         return desired
 
-    def _update_sound(self, desired_movement):
-        """Startet oder stoppt den Lauf-Sound."""
+    def _update_sound(self, desired_movement): #! Lauf sound start/stopp
         walk_sound = self.assets.sounds["dog_walk"]
         if not walk_sound: return
 
@@ -89,10 +85,8 @@ class Player(pygame.sprite.Sprite):
                 walk_sound.stop()
                 self.walk_sound_playing = False
     
-    def reset_speed(self):
-        """Setzt die Geschwindigkeit auf den Standardwert zurück."""
+    def reset_speed(self): #! Setzt die Geschwindigkeit zurück
         self.speed = self.base_speed
 
-    def draw(self, surface):
-        """Zeichnet den Spieler auf die angegebene Oberfläche."""
+    def draw(self, surface): #! Zeichnet den Spieler auf die Oberfläche
         surface.blit(self.image, self.rect)

@@ -3,23 +3,28 @@ import sys
 import os
 import random
 import math
-from . import settings         # <-- Anpassung hier
-from .assets import Assets      # <-- Anpassung hier
-from .player import Player      # <-- Anpassung hier
-from .sheep import Sheep        # <-- Anpassung hier
-from .enemy import Enemy        # <-- Anpassung hier
-from .items import Powerup, Snack # <-- Anpassung hier
-from .ui import Button, PopupText, AnimatedObject, draw_hud, draw_time, draw_glow, open_url # <-- Anpassung hier
-from .events import EventManager  # <-- Anpassung hier
 
-class Game:
-    """Die Hauptklasse, die das gesamte Spiel steuert."""
+from . import settings
+from .assets import Assets
+from .player import Player
+from .sheep import Sheep
+from .enemy import Enemy
+from .items import Powerup, Snack
+from .ui import Button, PopupText, AnimatedObject, draw_hud, draw_time, draw_glow, open_url # <-- Anpassung hier
+from .events import EventManager
+
+#* Diese Datei handlet die Hintergrund und Spiel Logik
+
+class Game: #! Hauptklasse die das Spiel steuert
     def __init__(self):
         pygame.init()
-        # Bildschirm-Setup mit Skalierung
+        #! Bildschirm-Setup mit Skalierung
         self.real_screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         self.screen_width, self.screen_height = self.real_screen.get_size()
         self.virtual_screen = pygame.Surface((settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT))
+        
+        #! speichert optionen zur skalierung mit der mausumrechnung
+        self.scale_info = {"factor": 1.0, "offset_x": 0, "offset_y": 0}
         
         pygame.display.set_caption(settings.TITLE)
         self.clock = pygame.time.Clock()
@@ -27,12 +32,12 @@ class Game:
         self.state = "menu"
         self.tick = 0
         
-        # Assets laden
+        #! Assets laden
         self.assets = Assets()
         if self.assets.images.get("icon"):
             pygame.display.set_icon(self.assets.images["icon"])
             
-        # Spielvariablen
+        #! Spielvariablen
         self.difficulty = "Leicht"
         self.lives = 0
         self.score = 0
@@ -40,7 +45,7 @@ class Game:
         self.highscore = 0
         self._load_saved_data()
 
-        # Sprite-Gruppen
+        #! Sprite-Gruppen
         self.all_sprites = pygame.sprite.Group()
         self.sheep_group = pygame.sprite.Group()
         self.enemy_group = pygame.sprite.Group()
@@ -48,10 +53,10 @@ class Game:
         self.snack_group = pygame.sprite.Group()
         self.popup_group = pygame.sprite.Group()
 
-        # Menü-Setup
+        #! Menü-Setup
         self._setup_menu()
 
-        # Spiel-Setup
+        #! Spiel-Setup
         self.player = None
         self.stall_rect = None
         self.block_zone = None
@@ -60,7 +65,7 @@ class Game:
         self.chosen_map_base = ""
         self.currently_followed_sheep = None
         
-        # Power-up-Zustände
+        #! Power-up-Zustände
         self.active_powerup = None
         self.powerup_effect_timer = 0.0
         self.magnet_range = settings.BASE_MAGNET_RANGE
@@ -71,8 +76,7 @@ class Game:
         self.music_started = False
         self.game_over = False
 
-    def _load_saved_data(self):
-        """Lädt Highscore und Münzen aus Textdateien."""
+    def _load_saved_data(self): #! Lädt Spielstand aus den Txt dateien
         try:
             with open("highscore.txt", "r") as f:
                 self.highscore = int(f.read().strip())
@@ -84,8 +88,7 @@ class Game:
         except (FileNotFoundError, ValueError):
             self.coins = 0
             
-    def _save_data(self):
-        """Speichert Highscore und Münzen."""
+    def _save_data(self): #! Speichert den Spielstand in die txt dateien
         if self.score > self.highscore:
             self.highscore = self.score
             with open("highscore.txt", "w") as f:
@@ -93,12 +96,11 @@ class Game:
         with open("coins.txt", "w") as f:
             f.write(str(self.coins))
 
-    def run(self):
-        """Die Haupt-Spielschleife."""
+    def run(self): #* Die Hauptspielschleife
         while self.is_running:
             dt = self.clock.tick(settings.FPS) / 1000.0
             
-            # Je nach Zustand die entsprechende Methode aufrufen
+            #* je nach schwierigkeit die richtige methode abrufen
             if self.state == "menu":
                 self._run_menu(dt)
             elif self.state == "choose_difficulty":
@@ -106,31 +108,43 @@ class Game:
             elif self.state == "game":
                 self._run_game(dt)
             
-            # Skaliere den virtuellen Bildschirm auf den echten Bildschirm
+            #! den bildschirm skalieren
             self._scale_and_draw_to_real_screen()
             self.tick += 1
 
-    def _scale_and_draw_to_real_screen(self):
-        """Skaliert den virtuellen Bildschirm und zeichnet ihn auf den echten."""
-        scale_factor = min(self.screen_width / settings.VIRTUAL_WIDTH, self.screen_height / settings.VIRTUAL_HEIGHT)
-        scaled_width = int(settings.VIRTUAL_WIDTH * scale_factor)
-        scaled_height = int(settings.VIRTUAL_HEIGHT * scale_factor)
+    def _scale_and_draw_to_real_screen(self): #! SKALIERT den visuellen bildschirm auf den echten zurecht
+        self.scale_info["factor"] = min(self.screen_width / settings.VIRTUAL_WIDTH, self.screen_height / settings.VIRTUAL_HEIGHT)
+        scaled_width = int(settings.VIRTUAL_WIDTH * self.scale_info["factor"])
+        scaled_height = int(settings.VIRTUAL_HEIGHT * self.scale_info["factor"])
         
         scaled_surface = pygame.transform.scale(self.virtual_screen, (scaled_width, scaled_height))
         
-        pos_x = (self.screen_width - scaled_width) / 2
-        pos_y = (self.screen_height - scaled_height) / 2
+        self.scale_info["offset_x"] = (self.screen_width - scaled_width) / 2
+        self.scale_info["offset_y"] = (self.screen_height - scaled_height) / 2
         
         self.real_screen.fill(settings.BLACK)
-        self.real_screen.blit(scaled_surface, (pos_x, pos_y))
+        self.real_screen.blit(scaled_surface, (self.scale_info["offset_x"], self.scale_info["offset_y"]))
         pygame.display.flip()
+
+    #! NEUE HILFSFUNKTION - maus umrechnung
+    def _get_virtual_mouse_pos(self):
+        """Konvertiert die realen Mauskoordinaten in virtuelle Koordinaten."""
+        mx, my = pygame.mouse.get_pos()
+        factor = self.scale_info["factor"]
+        offset_x = self.scale_info["offset_x"]
+        offset_y = self.scale_info["offset_y"]
         
-    # ---------------------------------
-    # MENÜ-LOGIK
-    # ---------------------------------
+        if factor == 0: return 0, 0 # Division durch Null verhindern
+            
+        virtual_mx = int((mx - offset_x) / factor)
+        virtual_my = int((my - offset_y) / factor)
+        return virtual_mx, virtual_my
+        
+    #! ---------------------------------
+    #! MENÜ-LOGIK
+    #! ---------------------------------
     
-    def _setup_menu(self):
-        """Initialisiert alle Elemente des Hauptmenüs."""
+    def _setup_menu(self): #! Initialisiert alle Hauptmenü Elemente
         self.menu_buttons = self._create_menu_buttons()
         self.difficulty_buttons = self._create_difficulty_buttons()
         self.bg_frame_index = 0
@@ -165,16 +179,24 @@ class Game:
         return normal_img, hover_img
 
     def _run_menu(self, dt):
+        virtual_mouse_pos = self._get_virtual_mouse_pos()
+        for button in self.menu_buttons.values():
+            button.update_hover(virtual_mouse_pos)
+            
         self._handle_events(self.menu_buttons)
         self._update_menu_animations(dt)
         self._draw_menu()
 
     def _run_difficulty_selection(self, dt):
+        virtual_mouse_pos = self._get_virtual_mouse_pos()
+        for button in self.difficulty_buttons.values():
+            button.update_hover(virtual_mouse_pos)
+
         self._handle_events(self.difficulty_buttons)
         self._update_menu_animations(dt)
         self._draw_difficulty_selection()
 
-    def _handle_events(self, buttons):
+    def _handle_events(self, buttons): #! Event verarbeitung
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.is_running = False
@@ -226,9 +248,9 @@ class Game:
     def _play_click(self):
         if self.assets.sounds["click"]: self.assets.sounds["click"].play()
 
-    # ---------------------------------
-    # SPIEL-LOGIK
-    # ---------------------------------
+    #! ---------------------------------
+    #! SPIEL-LOGIK
+    #! ---------------------------------
 
     def _start_game(self, difficulty):
         self.difficulty = difficulty
@@ -343,27 +365,25 @@ class Game:
             self.virtual_screen.blit(esc_text, esc_text.get_rect(center=(settings.VIRTUAL_WIDTH // 2, settings.VIRTUAL_HEIGHT // 2 + 40)))
 
     def _update_time(self, dt):
-        time_multiplier = 2 if self.night_mode else 1
-        # Die Zeit vergeht hier realistischer; 1 Sekunde im echten Leben sind ca. 1 Minute im Spiel
+        time_multiplier = 2 if self.night_mode else 1 #! 1 sek im leben = 1 min im spiel
         self.game_minutes += dt * time_multiplier 
         
         was_day = not self.night_mode
         self.night_mode = settings.NIGHT_START_MINUTES <= self.game_minutes < settings.DAY_START_MINUTES
         is_day = not self.night_mode
         
-        if self.night_mode and was_day: # Übergang zu Nacht
+        if self.night_mode and was_day: #! Übergang zu Nacht
             self.map_surface = self.assets.load_map(self.chosen_map_base, True)
             self.play_music()
             self._spawn_enemies()
-        elif is_day and not was_day: # Übergang zu Tag
+        elif is_day and not was_day: #! Übergang zu Tag
             self.current_day += 1
             self.game_minutes = settings.GAME_START_MINUTES
             self.map_surface = self.assets.load_map(self.chosen_map_base, False)
             self.play_music()
             self.enemy_group.empty()
 
-    def _handle_sheep_logic(self, dt):
-        # Timer abgelaufen?
+    def _handle_sheep_logic(self, dt):  #! Timer abgelaufen?
         for sheep in list(self.sheep_group):
             if sheep.timer_remaining <= 0:
                 self.lives -= 1
@@ -374,7 +394,7 @@ class Game:
                 self._spawn_single_sheep()
                 self._check_game_over()
 
-        # Neues Schaf verfolgen?
+        #! Neues Schaf verfolgen?
         if self.currently_followed_sheep is None:
             for sheep in self.sheep_group:
                 if not sheep.following:
@@ -384,13 +404,13 @@ class Game:
                         self.currently_followed_sheep = sheep
                         break
         
-        # Aktuelle Verfolgung
+        #! Aktuelle Verfolgung
         if self.currently_followed_sheep:
-            # Abbruchchance
+            #! Abbruchchance
             if random.random() < settings.SHEEP_CANCEL_CHANCE.get(self.difficulty, 0):
                 self.currently_followed_sheep.stop_following()
                 self.currently_followed_sheep = None
-            # Abliefern
+            #! Abliefern
             elif self.delivery_zone.colliderect(self.currently_followed_sheep.rect):
                 self.score += 1
                 self.coins += 1
@@ -400,14 +420,14 @@ class Game:
                 self._spawn_single_sheep()
                 self.currently_followed_sheep = None
 
-    def _handle_collisions(self):
-        # Spieler mit Power-ups
+    def _handle_collisions(self): #! Collision handling mit objekten
+        #! Spieler mit Power-ups
         collided_powerups = pygame.sprite.spritecollide(self.player, self.powerup_group, True)
         for powerup in collided_powerups:
             if self.assets.sounds["powerup"]: self.assets.sounds["powerup"].play()
             self._apply_powerup_effect(powerup)
 
-        # Spieler mit Snacks
+        #! Spieler mit Snacks
         collided_snacks = pygame.sprite.spritecollide(self.player, self.snack_group, True)
         for snack in collided_snacks:
             if snack.type == "healthy":
@@ -415,13 +435,13 @@ class Game:
                 self.score += 1
                 self.popup_group.add(PopupText(snack.rect.centerx, snack.rect.y, "+2 Coins", self.assets.pixel_font_small, settings.TIMER_COLOR))
                 if self.assets.sounds["dog_eat"]: self.assets.sounds["dog_eat"].play()
-            else: # toxic
+            else: #! toxic snack = lebensabzug
                 self.lives -= 1
                 self.popup_group.add(PopupText(snack.rect.centerx, snack.rect.y, "Vergiftet!", self.assets.pixel_font_small, settings.RED))
                 if self.assets.sounds["cancel"]: self.assets.sounds["cancel"].play()
                 self._check_game_over()
 
-        # Spieler mit Gegnern
+        #! Spieler mit Gegnern = ebenfalls lebensabzug
         if self.night_mode:
             collided_enemies = pygame.sprite.spritecollide(self.player, self.enemy_group, True)
             if collided_enemies:
@@ -445,10 +465,10 @@ class Game:
         elif powerup.type == "score10":
             self.score += settings.POWERUP_SCORE_BONUS
             self.popup_group.add(PopupText(powerup.rect.centerx, powerup.rect.y, f"+{settings.POWERUP_SCORE_BONUS} Score", self.assets.pixel_font_small, settings.TIMER_COLOR))
-            self.active_powerup = None # Sofortiger Effekt
+            self.active_powerup = None #! Sofortiger Effekt
         elif powerup.type == "random":
              random_type = random.choice(["speed", "magnet", "score10", "freeze"])
-             # Erstelle ein "Dummy"-Powerup, um den Effekt auszulösen
+             #! Erstelle ein "Dummy"-Powerup, um den Effekt auszulösen
              dummy_powerup = Powerup(0,0, random_type, self.assets)
              self._apply_powerup_effect(dummy_powerup)
     
