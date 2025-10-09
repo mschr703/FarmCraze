@@ -101,6 +101,14 @@ class Assets: #! Eine Klasse für die Farmcraze Spiel assets
 
         images["enemy"] = self._load_sprite_sheet("./media/game/sprites/enemy/", {"left": "wolf-left.png", "right": "wolf-right.png"}, settings.ENEMY_SCALE)
         
+        #* Boost-Effekt Grafiken
+        images["boost_effects"] = {
+            "up": self._load_image("./media/game/sprites/effects/boost/up.png", scale_by=settings.PLAYER_SCALE * 1.5),
+            "down": self._load_image("./media/game/sprites/effects/boost/down.png", scale_by=settings.PLAYER_SCALE * 1.5),
+            "left": self._load_image("./media/game/sprites/effects/boost/left.png", scale_by=settings.PLAYER_SCALE * 1.5),
+            "right": self._load_image("./media/game/sprites/effects/boost/right.png", scale_by=settings.PLAYER_SCALE * 1.5),
+        }
+
         #* Power-ups und Snacks
         images["powerups"] = self._load_sprite_sheet("./media/game/images/powerups/powerups-day/", {
             "speed": "powerup-speed.png", "magnet": "powerup-magnet.png", "score10": "powerup-10.png",

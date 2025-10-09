@@ -10,6 +10,10 @@
 #?
 #? [PLSP] -> Player Speed
 #? [PLGF] -> Player Glide Friction (Beim Regen)
+#? [PLDS] -> Player Dash Speed Multiplier
+#? [PLDD] -> Player Dash Duration
+#? [PLDC] -> Player Dash Cooldown
+#? [PLDT] -> Player Double Tap Interval
 #? ---------------------------------
 
 #? ---------------------------------
@@ -122,6 +126,12 @@ CLOCK_HUD_PATH = "./media/game/images/clock.png"
 PLAYER_START_SPEED = 5 #* [PLSP]
 PLAYER_SCALE = 0.1
 PLAYER_GLIDE_FRICTION = 0.92  #* [PLGF]
+
+#! Dash / Boost
+PLAYER_DASH_SPEED_MULTIPLIER = 4  #* [PLDS]
+PLAYER_DASH_DURATION = 0.15       #* [PLDD] - in Sekunden
+PLAYER_DASH_COOLDOWN = 3.0        #* [PLDC] - in Sekunden
+DOUBLE_TAP_INTERVAL = 0.25        #* [PLDT] - in Sekunden
 
 #! --------------------
 #! TIER-EINSTELLUNGEN

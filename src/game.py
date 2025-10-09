@@ -306,12 +306,17 @@ class Game: #! Hauptklasse die das Spiel steuert
     def _handle_game_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT: self._quit_game()
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE: self._reset_game()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    self._reset_game()
+                #* Leitet das Key-Event an den Spieler weiter (für den Dash)
+                if self.player and not self.game_over:
+                    self.player.handle_key_down(event.key)
 
     def _update_game_logic(self, dt):
         keys = pygame.key.get_pressed()
         
-        self.player.update(keys, [self.block_zone])
+        self.player.update(keys, [self.block_zone], dt)
         self.sheep_group.update(dt, self.player.rect, self.freeze_active)
         self.enemy_group.update(dt)
         self.powerup_group.update(dt)
