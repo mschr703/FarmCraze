@@ -85,21 +85,21 @@ class Assets: #! Eine Klasse für die Farmcraze Spiel assets
         #* Manuelles Laden der Spieler-Sprites, um die deutschen Dateinamen
         #* den englischen Logik-Namen zuzuordnen.
         images["player"] = {
-            "up": self._load_image("./media/game/sprites/player/oben.png", scale_by=settings.PLAYER_SCALE),
-            "down": self._load_image("./media/game/sprites/player/unten.png", scale_by=settings.PLAYER_SCALE),
-            "left": self._load_image("./media/game/sprites/player/links.png", scale_by=settings.PLAYER_SCALE),
-            "right": self._load_image("./media/game/sprites/player/rechts.png", scale_by=settings.PLAYER_SCALE)
+            "up": self._load_image("./media/game/sprites/entities/friendly/player/oben.png", scale_by=settings.PLAYER_SCALE),
+            "down": self._load_image("./media/game/sprites/entities/friendly/player/unten.png", scale_by=settings.PLAYER_SCALE),
+            "left": self._load_image("./media/game/sprites/entities/friendly/player/links.png", scale_by=settings.PLAYER_SCALE),
+            "right": self._load_image("./media/game/sprites/entities/friendly/player/rechts.png", scale_by=settings.PLAYER_SCALE)
         }
         
         #* gleicher grund wie oben ^ für die schaf sprites
         images["sheep"] = {
-            "up": self._load_image("./media/game/sprites/sheep/oben.png", scale_by=settings.SHEEP_SCALE),
-            "down": self._load_image("./media/game/sprites/sheep/unten.png", scale_by=settings.SHEEP_SCALE),
-            "left": self._load_image("./media/game/sprites/sheep/links.png", scale_by=settings.SHEEP_SCALE),
-            "right": self._load_image("./media/game/sprites/sheep/rechts.png", scale_by=settings.SHEEP_SCALE)
+            "up": self._load_image("./media/game/sprites/entities/friendly/sheep/oben.png", scale_by=settings.SHEEP_SCALE),
+            "down": self._load_image("./media/game/sprites/entities/friendly/sheep/unten.png", scale_by=settings.SHEEP_SCALE),
+            "left": self._load_image("./media/game/sprites/entities/friendly/sheep/links.png", scale_by=settings.SHEEP_SCALE),
+            "right": self._load_image("./media/game/sprites/entities/friendly/sheep/rechts.png", scale_by=settings.SHEEP_SCALE)
         }
 
-        images["enemy"] = self._load_sprite_sheet("./media/game/sprites/enemy/", {"left": "wolf-left.png", "right": "wolf-right.png"}, settings.ENEMY_SCALE)
+        images["enemy"] = self._load_sprite_sheet("./media/game/sprites/entities/hostile/wolf/", {"left": "wolf-left.png", "right": "wolf-right.png"}, settings.ENEMY_SCALE)
         
         #* Boost-Effekt Grafiken
         images["boost_effects"] = {
