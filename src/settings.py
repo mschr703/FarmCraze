@@ -71,6 +71,11 @@ FPS = 60
 TITLE = "FarmCraze"
 
 #! --------------------
+#! TRANSITION
+#! --------------------
+TRANSITION_SPEED = 3000 #* [TRSP] -> Geschwindigkeit der Ladeanimation (Kreis)
+
+#! --------------------
 #! FARBEN
 #! --------------------
 WHITE = (255, 255, 255)

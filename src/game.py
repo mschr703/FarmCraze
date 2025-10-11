@@ -75,6 +75,13 @@ class Game: #! Hauptklasse die das Spiel steuert
         
         self.music_started = False
         self.game_over = False
+        
+        #! Übergangs-Animation
+        self.is_transitioning = False
+        self.transition_mode = "in" # "in" (aufdecken) oder "out" (verdecken)
+        self.max_radius = math.hypot(settings.VIRTUAL_WIDTH / 2, settings.VIRTUAL_HEIGHT / 2)
+        self.transition_radius = self.max_radius # Startet voll sichtbar
+        self.on_transition_complete = None
 
     def _load_saved_data(self): #! Lädt Spielstand aus den Txt dateien
         try:
@@ -107,6 +114,11 @@ class Game: #! Hauptklasse die das Spiel steuert
                 self._run_difficulty_selection(dt)
             elif self.state == "game":
                 self._run_game(dt)
+            
+            #* Übergangsanimation über alles zeichnen
+            if self.is_transitioning:
+                self._update_transition(dt)
+                self._draw_transition()
             
             #! den bildschirm skalieren
             self._scale_and_draw_to_real_screen()
@@ -157,7 +169,7 @@ class Game: #! Hauptklasse die das Spiel steuert
         btn_y, spacing = settings.MENU_BUTTON_START_Y, settings.MENU_BUTTON_SPACING
         btn_imgs = {name: self._load_button_images(name) for name in ["spielen", "anleitung", "verlassen"]}
         return {
-            "spielen": Button((settings.VIRTUAL_WIDTH // 2, btn_y), settings.MENU_BUTTON_SIZE, btn_imgs["spielen"][0], btn_imgs["spielen"][1], self._go_to_difficulty, self._play_click),
+            "spielen": Button((settings.VIRTUAL_WIDTH // 2, btn_y), settings.MENU_BUTTON_SIZE, btn_imgs["spielen"][0], btn_imgs["spielen"][1], lambda: self._start_transition(self._go_to_difficulty), self._play_click),
             "anleitung": Button((settings.VIRTUAL_WIDTH // 2, btn_y + spacing), settings.MENU_BUTTON_SIZE, btn_imgs["anleitung"][0], btn_imgs["anleitung"][1], lambda: open_url(settings.ANLEITUNG_URL), self._play_click),
             "verlassen": Button((settings.VIRTUAL_WIDTH // 2, btn_y + 2 * spacing), settings.MENU_BUTTON_SIZE, btn_imgs["verlassen"][0], btn_imgs["verlassen"][1], self._quit_game, self._play_click)
         }
@@ -166,9 +178,9 @@ class Game: #! Hauptklasse die das Spiel steuert
         btn_y, spacing = settings.DIFF_BUTTON_START_Y, settings.DIFF_BUTTON_SPACING
         btn_imgs = {name: self._load_button_images(name, True) for name in ["leicht", "mittel", "schwer"]}
         return {
-            "leicht": Button((settings.VIRTUAL_WIDTH // 2, btn_y), settings.DIFF_BUTTON_SIZE, btn_imgs["leicht"][0], btn_imgs["leicht"][1], lambda: self._start_game("Leicht"), self._play_click),
-            "mittel": Button((settings.VIRTUAL_WIDTH // 2, btn_y + spacing), settings.DIFF_BUTTON_SIZE, btn_imgs["mittel"][0], btn_imgs["mittel"][1], lambda: self._start_game("Mittel"), self._play_click),
-            "schwer": Button((settings.VIRTUAL_WIDTH // 2, btn_y + 2 * spacing), settings.DIFF_BUTTON_SIZE, btn_imgs["schwer"][0], btn_imgs["schwer"][1], lambda: self._start_game("Schwer"), self._play_click)
+            "leicht": Button((settings.VIRTUAL_WIDTH // 2, btn_y), settings.DIFF_BUTTON_SIZE, btn_imgs["leicht"][0], btn_imgs["leicht"][1], lambda: self._start_transition(lambda: self._start_game("Leicht")), self._play_click),
+            "mittel": Button((settings.VIRTUAL_WIDTH // 2, btn_y + spacing), settings.DIFF_BUTTON_SIZE, btn_imgs["mittel"][0], btn_imgs["mittel"][1], lambda: self._start_transition(lambda: self._start_game("Mittel")), self._play_click),
+            "schwer": Button((settings.VIRTUAL_WIDTH // 2, btn_y + 2 * spacing), settings.DIFF_BUTTON_SIZE, btn_imgs["schwer"][0], btn_imgs["schwer"][1], lambda: self._start_transition(lambda: self._start_game("Schwer")), self._play_click)
         }
 
     def _load_button_images(self, name, is_diff=False):
@@ -184,7 +196,9 @@ class Game: #! Hauptklasse die das Spiel steuert
             button.update_hover(virtual_mouse_pos)
             
         self._handle_events(self.menu_buttons)
-        self._update_menu_animations(dt)
+        #* Logik nur aktualisieren, wenn nicht gerade ausgeblendet wird
+        if not (self.is_transitioning and self.transition_mode == "out"):
+            self._update_menu_animations(dt)
         self._draw_menu()
 
     def _run_difficulty_selection(self, dt):
@@ -193,7 +207,9 @@ class Game: #! Hauptklasse die das Spiel steuert
             button.update_hover(virtual_mouse_pos)
 
         self._handle_events(self.difficulty_buttons)
-        self._update_menu_animations(dt)
+        #* Logik nur aktualisieren, wenn nicht gerade ausgeblendet wird
+        if not (self.is_transitioning and self.transition_mode == "out"):
+            self._update_menu_animations(dt)
         self._draw_difficulty_selection()
 
     def _handle_events(self, buttons): #! Event verarbeitung
@@ -201,7 +217,7 @@ class Game: #! Hauptklasse die das Spiel steuert
             if event.type == pygame.QUIT:
                 self.is_running = False
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.state == "choose_difficulty":
-                self.state = "menu"
+                self._start_transition(self._go_to_menu) #! Übergang zum Menü
             for button in buttons.values():
                 button.handle_event(event)
 
@@ -244,9 +260,48 @@ class Game: #! Hauptklasse die das Spiel steuert
         self.virtual_screen.blit(self.assets.images["logo"], logo_rect)
 
     def _go_to_difficulty(self): self.state = "choose_difficulty"
+    def _go_to_menu(self): self.state = "menu"
     def _quit_game(self): self.is_running = False
     def _play_click(self):
         if self.assets.sounds["click"]: self.assets.sounds["click"].play()
+
+    #! ---------------------------------
+    #! TRANSITION-LOGIK
+    #! ---------------------------------
+
+    def _start_transition(self, on_complete_callback): #! Startet die ausblend-animation
+        if self.is_transitioning: return
+        self.is_transitioning = True
+        self.transition_mode = "out"
+        self.transition_radius = self.max_radius
+        self.on_transition_complete = on_complete_callback
+
+    def _update_transition(self, dt): #! Aktualisiert den radius des kreises
+        if self.transition_mode == "out":
+            self.transition_radius -= settings.TRANSITION_SPEED * dt
+            if self.transition_radius <= 0:
+                self.transition_radius = 0
+                if self.on_transition_complete:
+                    self.on_transition_complete() #* Zustand wechseln
+                self.transition_mode = "in" #* Direkt wieder einblenden
+        elif self.transition_mode == "in":
+            self.transition_radius += settings.TRANSITION_SPEED * dt
+            if self.transition_radius >= self.max_radius:
+                self.transition_radius = self.max_radius
+                self.is_transitioning = False
+                self.on_transition_complete = None
+
+    def _draw_transition(self): #! Zeichnet den schwarzen kreis-overlay
+        if self.transition_radius >= self.max_radius and self.transition_mode == "in":
+            return
+
+        #* Eine schwarze Oberfläche erstellen und einen transparenten Kreis hinein "schneiden"
+        color_key = (1, 2, 3) # Eine unwahrscheinliche Farbe
+        overlay = pygame.Surface((settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT))
+        overlay.fill(settings.BLACK)
+        pygame.draw.circle(overlay, color_key, (settings.VIRTUAL_WIDTH // 2, settings.VIRTUAL_HEIGHT // 2), int(self.transition_radius))
+        overlay.set_colorkey(color_key)
+        self.virtual_screen.blit(overlay, (0, 0))
 
     #! ---------------------------------
     #! SPIEL-LOGIK
@@ -298,8 +353,10 @@ class Game: #! Hauptklasse die das Spiel steuert
         self._handle_game_events()
         if self.state != "game": return
         
-        if not self.game_over:
-            self._update_game_logic(dt)
+        #* Logik nur aktualisieren, wenn nicht gerade ausgeblendet wird
+        if not (self.is_transitioning and self.transition_mode == "out"):
+            if not self.game_over:
+                self._update_game_logic(dt)
         
         self._draw_game()
 
@@ -308,7 +365,7 @@ class Game: #! Hauptklasse die das Spiel steuert
             if event.type == pygame.QUIT: self._quit_game()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    self._reset_game()
+                    self._start_transition(self._reset_game) #! Übergang zum Menü
                 #* Leitet das Key-Event an den Spieler weiter (für den Dash)
                 if self.player and not self.game_over:
                     self.player.handle_key_down(event.key)
