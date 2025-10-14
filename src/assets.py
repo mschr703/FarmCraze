@@ -1,8 +1,28 @@
 import pygame
 import os
+import sys # <-- Hinzugefügt
 from . import settings
 
 #* Diese Datei ist zuständig für die Assets im Spiel
+
+# =============================================================================
+# ! WICHTIGE HILFSFUNKTION FÜR DIE .EXE-DATEI
+# Diese Funktion stellt sicher, dass alle Assets (Bilder, Sounds, etc.)
+# sowohl beim Entwickeln (als .py) als auch im fertigen Spiel (als .exe)
+# gefunden werden.
+# =============================================================================
+def resource_path(relative_path):
+    """ Ermittelt den absoluten Pfad zu einer Ressource. """
+    try:
+        # PyInstaller erstellt einen temporären Ordner und speichert den Pfad in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        # Wenn wir nicht als .exe laufen, ist der Basispfad der Ordner des Skripts
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+# =============================================================================
+
 
 class Assets: #! Eine Klasse für die Farmcraze Spiel assets
     def __init__(self):
@@ -18,17 +38,18 @@ class Assets: #! Eine Klasse für die Farmcraze Spiel assets
         self.images = self._load_images()
 
     def _load_font(self, path, size): #! Font-download mit fallback
+        font_path = resource_path(path) # <-- Anpassung hier
         try:
-            return pygame.font.Font(path, size)
+            return pygame.font.Font(font_path, size)
         except pygame.error:
-            print(f"WARNUNG: Schriftart '{path}' nicht gefunden. Nutze Fallback.")
+            print(f"WARNUNG: Schriftart '{font_path}' nicht gefunden. Nutze Fallback.")
             return pygame.font.SysFont("couriernew", size, bold=True)
 
     def _load_sounds(self): #! Lädt die sound dateien in ein dict
         return {
-            "menu_music": settings.MENU_MUSIC_PATH,
-            "day_music": settings.DAY_MUSIC_PATH,
-            "night_music": settings.NIGHT_MUSIC_PATH,
+            "menu_music": resource_path(settings.MENU_MUSIC_PATH),
+            "day_music": resource_path(settings.DAY_MUSIC_PATH),
+            "night_music": resource_path(settings.NIGHT_MUSIC_PATH),
             "vogel": self._load_sound(settings.BIRD_SOUND_PATH),
             "click": self._load_sound(settings.BUTTON_CLICK_SOUND_PATH),
             "cancel": self._load_sound(settings.CANCEL_SOUND_PATH),
@@ -46,10 +67,11 @@ class Assets: #! Eine Klasse für die Farmcraze Spiel assets
         }
 
     def _load_sound(self, path): #! Lädt eine einzelnde sound datei
+        sound_path = resource_path(path) # <-- Anpassung hier
         try:
-            return pygame.mixer.Sound(path)
+            return pygame.mixer.Sound(sound_path)
         except pygame.error:
-            print(f"WARNUNG: Sound '{path}' konnte nicht geladen werden.")
+            print(f"WARNUNG: Sound '{sound_path}' konnte nicht geladen werden.")
             return None #? Gibt None zurück, um crashes zu vermeiden
 
     def _set_sound_volumes(self): #! Lautstärkeregler für sound dateien
@@ -121,14 +143,15 @@ class Assets: #! Eine Klasse für die Farmcraze Spiel assets
         return images
 
     def _load_image(self, path, scale_by=None): #! Lädt ein einzelnes bild
+        image_path = resource_path(path) # <-- Anpassung hier
         try:
-            img = pygame.image.load(path).convert_alpha()
+            img = pygame.image.load(image_path).convert_alpha()
             if scale_by:
                 new_size = (int(img.get_width() * scale_by), int(img.get_height() * scale_by))
                 img = pygame.transform.scale(img, new_size)
             return img
         except pygame.error as e:
-            print(f"FEHLER: Bild '{path}' konnte nicht geladen werden. Fehler: {e}")
+            print(f"FEHLER: Bild '{image_path}' konnte nicht geladen werden. Fehler: {e}")
             #* Programm beenden, wenn kritische bilder vorhanden sind
             pygame.quit()
             raise SystemExit()
@@ -138,15 +161,18 @@ class Assets: #! Eine Klasse für die Farmcraze Spiel assets
         return [self._load_image(path, scale_by) for path in paths]
 
     def _load_animation_frames(self, folder_path): #! animations-frames
+        folder = resource_path(folder_path) # <-- Anpassung hier
         frames = []
-        if not os.path.exists(folder_path):
-            print(f"WARNUNG: Animations-Ordner '{folder_path}' nicht gefunden.")
+        if not os.path.exists(folder):
+            print(f"WARNUNG: Animations-Ordner '{folder}' nicht gefunden.")
             return [pygame.Surface((settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT))]
 
-        for filename in sorted(os.listdir(folder_path)):
+        for filename in sorted(os.listdir(folder)):
             if filename.endswith(".png"):
-                img_path = os.path.join(folder_path, filename)
-                img = self._load_image(img_path)
+                img_path = os.path.join(folder, filename)
+                # Hier _load_image NICHT erneut aufrufen, da es resource_path schon anwendet
+                # und der Pfad hier schon absolut ist.
+                img = pygame.image.load(img_path).convert_alpha()
                 img = pygame.transform.scale(img, (settings.VIRTUAL_WIDTH, settings.VIRTUAL_HEIGHT))
                 frames.append(img)
         return frames
@@ -165,7 +191,7 @@ class Assets: #! Eine Klasse für die Farmcraze Spiel assets
 
     def load_map(self, map_base_path, is_night): #! Lädt maps (day/night)
         suffix = "-night.png" if is_night else "-day.png"
-        map_path = map_base_path + suffix
+        map_path = resource_path(map_base_path + suffix) # <-- Anpassung hier
         if os.path.exists(map_path):
             print(f"Lade Karte: '{map_path}'")
             loaded_map = pygame.image.load(map_path).convert()
