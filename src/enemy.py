@@ -10,7 +10,11 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, assets):
         super().__init__()
         self.assets = assets
-        self.images = self.assets.images["enemy"]
+        
+        #! KORREKTUR: Erstellt eine Kopie des Dictionaries, anstatt das
+        #! globale Asset-Dictionary (self.assets.images["enemy"]) zu verändern.
+        self.images = self.assets.images["enemy"].copy()
+        
         #! fügt up und down sprites hinzu (basierend auf left/right)
         self.images["up"] = self.images["left"]
         self.images["down"] = self.images["right"]
